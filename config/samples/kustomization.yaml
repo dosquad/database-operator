@@ -1,0 +1,5 @@
+## Append samples of your project ##
+resources:
+- dbo_v1_databaseaccount.yaml
+- dbo_v1_databaseaccountcontrollerconfig.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

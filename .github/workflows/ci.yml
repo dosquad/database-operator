@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request: {}
+  workflow_dispatch: {}
+
+jobs:
+  unittest:
+    name: "Unit Test"
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ^1
+      id: go
+
+    - name: Set up go env
+      run: export PATH=${PATH}:`go env GOPATH`/bin
+
+    - name: Run golangci/golangci-lint
+      uses: golangci/golangci-lint-action@v3
+      with:
+        skip-cache: true
+        version: latest
+
+    - name: Run Unit Tests
+      run: |
+        make test
+        git status
+
+    - name: Publish Unit Test Coverage
+      uses: codecov/codecov-action@v3
+      with:
+        flags: unittests
+        files: cover.out
+
+    - name: Check diff
+      run: '[[ -z $(git status -s) ]] || (printf "Existing modified/untracked files.\nPlease run \"make generate manifests\" and push again.\n"; exit 1)'
