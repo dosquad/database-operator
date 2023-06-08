@@ -2,7 +2,7 @@ module github.com/dosquad/database-operator
 
 go 1.20
 
-replace k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20230501164219-8b0f38b5fd1f
+replace k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20230501164219-8b0f38b5fd1f //nolint:gomoddirectives // needed during change over of gnostic.
 
 require (
 	github.com/jackc/pgx/v5 v5.3.1

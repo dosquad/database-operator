@@ -175,14 +175,15 @@ func (s *Server) CreateRole(ctx context.Context, roleName string) (string, strin
 		return "", "", err
 	}
 
-	roleName, err := s.CheckInvalidName(roleName)
-	if err != nil {
-		return "", "", fmt.Errorf("role name[%s]: %w", roleName, err)
+	roleName, rollNameErr := s.CheckInvalidName(roleName)
+	if rollNameErr != nil {
+		return "", "", fmt.Errorf("role name[%s]: %w", roleName, rollNameErr)
 	}
 
 	password := s.generatePassword(ctx)
 	stmt := fmt.Sprintf(`CREATE ROLE %s LOGIN PASSWORD '%s'`, roleName, password)
 	logger.V(1).Info(fmt.Sprintf("SQL: %s", stmt))
+
 	if _, err := s.conn.Exec(ctx, stmt); err != nil {
 		return "", "", err
 	}
@@ -194,9 +195,9 @@ func (s *Server) UpdateRolePassword(ctx context.Context, roleName string) (strin
 	_ = s.Connect(ctx)
 	logger := log.FromContext(ctx)
 
-	roleName, err := s.CheckInvalidName(roleName)
-	if err != nil {
-		return "", "", fmt.Errorf("role name[%s]: %w", roleName, err)
+	roleName, roleNameErr := s.CheckInvalidName(roleName)
+	if roleNameErr != nil {
+		return "", "", fmt.Errorf("role name[%s]: %w", roleName, roleNameErr)
 	}
 
 	password := s.generatePassword(ctx)
@@ -226,8 +227,8 @@ func (s *Server) CreateDatabase(ctx context.Context, dbName, roleName string) (s
 
 	stmt := fmt.Sprintf(`CREATE DATABASE %s OWNER %s`, dbName, roleName)
 	logger.V(1).Info(fmt.Sprintf("SQL: %s", stmt))
-	if _, err := s.conn.Exec(ctx, stmt); err != nil {
-		return "", err
+	if _, execErr := s.conn.Exec(ctx, stmt); execErr != nil {
+		return "", execErr
 	}
 
 	return dbName, nil
@@ -250,8 +251,8 @@ func (s *Server) CreateSchema(ctx context.Context, schemaName, roleName string) 
 
 	stmt := fmt.Sprintf(`CREATE SCHEMA IF NOT EXISTS %s AUTHORIZATION %s`, schemaName, roleName)
 	logger.V(1).Info(fmt.Sprintf("SQL: %s", stmt))
-	if _, err := s.conn.Exec(ctx, stmt); err != nil {
-		return err
+	if _, execErr := s.conn.Exec(ctx, stmt); execErr != nil {
+		return execErr
 	}
 
 	return nil
@@ -317,17 +318,17 @@ func (s *Server) Delete(ctx context.Context, name string) error {
 
 	stmt := fmt.Sprintf(`DROP DATABASE IF EXISTS %s WITH (FORCE)`, name)
 	logger.V(1).Info(fmt.Sprintf("SQL: %s", stmt))
-	if _, err := s.conn.Exec(ctx, stmt); err != nil {
-		if !strings.Contains(err.Error(), " not found") {
-			return err
+	if _, execErr := s.conn.Exec(ctx, stmt); execErr != nil {
+		if !strings.Contains(execErr.Error(), " not found") {
+			return execErr
 		}
 	}
 
 	stmt = fmt.Sprintf(`DROP ROLE IF EXISTS %s`, name)
 	logger.V(1).Info(fmt.Sprintf("SQL: %s", stmt))
-	if _, err := s.conn.Exec(ctx, stmt); err != nil {
-		if !strings.Contains(err.Error(), " not found") {
-			return err
+	if _, execErr := s.conn.Exec(ctx, stmt); execErr != nil {
+		if !strings.Contains(execErr.Error(), " not found") {
+			return execErr
 		}
 	}
 

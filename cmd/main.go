@@ -25,17 +25,16 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	"github.com/dosquad/database-operator/accountsvr"
+	dbov1 "github.com/dosquad/database-operator/api/v1"
+	"github.com/dosquad/database-operator/internal/controller"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	cfg "sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	"github.com/dosquad/database-operator/accountsvr"
-	dbov1 "github.com/dosquad/database-operator/api/v1"
-	v1 "github.com/dosquad/database-operator/api/v1"
-	"github.com/dosquad/database-operator/internal/controller"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -87,7 +86,7 @@ func mainCommand() error {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	ctrlConfig := v1.DatabaseAccountControllerConfig{}
+	ctrlConfig := dbov1.DatabaseAccountControllerConfig{}
 	options := ctrl.Options{
 		Scheme:                        scheme,
 		MetricsBindAddress:            metricsAddr,
@@ -98,23 +97,23 @@ func mainCommand() error {
 		LeaderElectionReleaseOnCancel: true,
 	}
 	if configFile != "" {
-		options, err = options.AndFrom(ctrl.ConfigFile().AtPath(configFile).OfKind(&ctrlConfig))
+		options, err = options.AndFrom(cfg.File().AtPath(configFile).OfKind(&ctrlConfig))
 		if err != nil {
 			setupLog.Error(err, "unable to load the config file")
 			return err
 		}
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
-	if err != nil {
-		setupLog.Error(err, "unable to start manager")
-		return err
+	mgr, mgrErr := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
+	if mgrErr != nil {
+		setupLog.Error(mgrErr, "unable to start manager")
+		return mgrErr
 	}
 
-	svr, err := accountsvr.NewServer(context.Background(), ctrlConfig.DatabaseDSN)
-	if err != nil {
-		setupLog.Error(err, "unable to start database connection")
-		return err
+	svr, svrErr := accountsvr.NewServer(context.Background(), ctrlConfig.DatabaseDSN)
+	if svrErr != nil {
+		setupLog.Error(svrErr, "unable to start database connection")
+		return svrErr
 	}
 	defer svr.Close(context.Background())
 
@@ -130,17 +129,17 @@ func mainCommand() error {
 	}
 	//+kubebuilder:scaffold:builder
 
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+	if err = mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
 		return err
 	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+	if err = mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up ready check")
 		return err
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err = mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		return err
 	}

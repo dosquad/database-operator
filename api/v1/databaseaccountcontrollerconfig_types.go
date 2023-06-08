@@ -21,9 +21,9 @@ import (
 	cfg "sigs.k8s.io/controller-runtime/pkg/config/v1alpha1"
 )
 
-// +kubebuilder:object:root=true
+// DatabaseAccountControllerConfig is the Schema for the databaseaccountcontrollerconfigs API.
 //
-// DatabaseAccountControllerConfig is the Schema for the databaseaccountcontrollerconfigs API
+// +kubebuilder:object:root=true
 type DatabaseAccountControllerConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -37,9 +37,9 @@ type DatabaseAccountControllerConfig struct {
 	DatabaseDSN string `json:"dsn,omitempty"`
 }
 
-// +kubebuilder:object:root=true
+// DatabaseAccountControllerConfigList contains a list of DatabaseAccountControllerConfig.
 //
-// DatabaseAccountControllerConfigList contains a list of DatabaseAccountControllerConfig
+// +kubebuilder:object:root=true
 type DatabaseAccountControllerConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

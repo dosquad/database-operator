@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+//nolint:gochecknoglobals // boilerplate generated test code
+package controller_test
 
 import (
 	"path/filepath"

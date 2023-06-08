@@ -25,12 +25,18 @@ import (
 )
 
 var (
-	// GroupVersion is group version used to register these objects
+	// GroupVersion is group version used to register these objects.
+	//
+	//nolint:gochecknoglobals // struct as constant.
 	GroupVersion = schema.GroupVersion{Group: "dbo.dosquad.github.io", Version: "v1"}
 
-	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
+	// SchemeBuilder is used to add go types to the GroupVersionKind scheme.
+	//
+	//nolint:gochecknoglobals // struct as constant.
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
 
 	// AddToScheme adds the types in this group-version to the given scheme.
+	//
+	//nolint:gochecknoglobals // struct as constant.
 	AddToScheme = SchemeBuilder.AddToScheme
 )

@@ -25,9 +25,7 @@ const (
 )
 
 // newDatabaseAccountName returns a newly generated database/username.
-//
-//nolint:unparam // ctx is sent for debugging with logger if needed.
-func newDatabaseAccountName(ctx context.Context) v1.PostgreSQLResourceName {
+func newDatabaseAccountName(_ context.Context) v1.PostgreSQLResourceName {
 	return v1.PostgreSQLResourceName(strings.ToLower("k8s_" + ulid.Make().String()))
 }
 
@@ -43,16 +41,16 @@ func secretRun(
 ) error {
 	logger := log.FromContext(ctx)
 
-	secret, err := secretGet(ctx, r, dbAccount)
-	if errors.Is(err, ErrNewSecret) {
+	secret, secretErr := secretGet(ctx, r, dbAccount)
+	if errors.Is(secretErr, ErrNewSecret) {
 		accountSvr.CopyConfigToSecret(secret)
-		if err = w.Create(ctx, secret); err != nil {
+		if err := w.Create(ctx, secret); err != nil {
 			logger.V(1).Error(err, "unable to create secret")
 
 			return err
 		}
-	} else if err != nil {
-		return err
+	} else if secretErr != nil {
+		return secretErr
 	}
 
 	preChecksum := crc32.ChecksumIEEE([]byte(secret.String()))
