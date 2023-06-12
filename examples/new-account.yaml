@@ -1,0 +1,7 @@
+---
+apiVersion: dbo.dosquad.github.io/v1
+kind: DatabaseAccount
+metadata:
+  labels:
+    app: testapp
+  name: testaccount

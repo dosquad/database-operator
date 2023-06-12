@@ -1,0 +1,5 @@
+apiVersion: dbo.dosquad.github.io/v1
+kind: DatabaseAccountControllerConfig
+metadata:
+  name: "controller-config"
+dsn: "postgres://postgres:mysecretpassword@localhost:5432/"

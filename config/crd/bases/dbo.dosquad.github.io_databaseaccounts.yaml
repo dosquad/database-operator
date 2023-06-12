@@ -15,7 +15,19 @@ spec:
     singular: databaseaccount
   scope: Namespaced
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - description: deployment stage for database account
+      jsonPath: .status.stage
+      name: Stage
+      type: string
+    - description: ready status of database account
+      jsonPath: .status.ready
+      name: Ready
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
     schema:
       openAPIV3Schema:
         description: DatabaseAccount is the Schema for the databaseaccounts API

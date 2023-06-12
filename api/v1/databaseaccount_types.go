@@ -97,6 +97,9 @@ type DatabaseAccountStatus struct {
 //
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Stage",type=string,JSONPath=`.status.stage`,description="deployment stage for database account"
+// +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.ready`,description="ready status of database account"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 type DatabaseAccount struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
