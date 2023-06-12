@@ -44,13 +44,13 @@ type DatabaseAccountReconciler struct {
 	Config        *dbov1.DatabaseAccountControllerConfig
 }
 
-// +kubebuilder:rbac:groups=dbo.dosquad.github.io,resources=databaseaccounts,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=dbo.dosquad.github.io,resources=databaseaccounts/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=dbo.dosquad.github.io,resources=databaseaccounts/finalizers,verbs=update
-// +kubebuilder:rbac:groups=dbo.dosquad.github.io,resources=events,verbs=create;patch
-// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
-//
+//+kubebuilder:rbac:groups=dbo.dosquad.github.io,resources=databaseaccounts,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=dbo.dosquad.github.io,resources=databaseaccounts/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=dbo.dosquad.github.io,resources=databaseaccounts/finalizers,verbs=update
+//+kubebuilder:rbac:groups=dbo.dosquad.github.io,resources=events,verbs=create;patch
+//+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
+
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
@@ -109,7 +109,7 @@ func (r *DatabaseAccountReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	return ctrl.Result{}, nil
 }
 
-//nolint:unparam // ctrl.Result being the same no matter what, need to look into this during refactor.
+// TODO ctrl.Result being the same no matter what, need to look into this during refactor.
 func (r *DatabaseAccountReconciler) handleFinalizers(
 	ctx context.Context,
 	dbAccount *dbov1.DatabaseAccount,

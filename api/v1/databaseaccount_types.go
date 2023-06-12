@@ -71,7 +71,7 @@ type DatabaseAccountStatus struct {
 	// State is the progress of creating the account.
 	//
 	// +optional
-	// +kubebuilder:default:=Init
+	//+kubebuilder:default:=Init
 	Stage DatabaseAccountCreateStage `json:"stage,omitempty"`
 
 	// Error is true if the DatabaseAccount is in error.
@@ -89,7 +89,7 @@ type DatabaseAccountStatus struct {
 
 	// Ready is the boolean for when a resource is ready to use.
 	//
-	// +kubebuilder:default:=false
+	//+kubebuilder:default:=false
 	Ready bool `json:"ready,omitempty"`
 }
 

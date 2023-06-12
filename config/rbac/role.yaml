@@ -6,6 +6,25 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - dbo.dosquad.github.io
   resources:
   - databaseaccounts
@@ -31,3 +50,10 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - dbo.dosquad.github.io
+  resources:
+  - events
+  verbs:
+  - create
+  - patch

@@ -326,7 +326,7 @@ issues:
     # Exclude `lll` issues for long lines with `go:generate`.
     - linters:
         - lll
-      source: '^// \+kubebuilder:'
+      source: '^//\s*\+kubebuilder:'
     - path: "api/v1/"
       linters:
         - gochecknoinits

@@ -125,7 +125,7 @@ uninstall: manifests $(KUSTOMIZE) ## Uninstall CRDs from the K8s cluster specifi
 
 .PHONY: deploy
 deploy: manifests $(KUSTOMIZE) ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	cd config/manager && ../../$(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
 .PHONY: undeploy
