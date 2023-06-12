@@ -21,18 +21,20 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
+	"github.com/dosquad/database-operator/accountsvr"
+	dbov1 "github.com/dosquad/database-operator/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	"github.com/dosquad/database-operator/accountsvr"
-	dbov1 "github.com/dosquad/database-operator/api/v1"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 // DatabaseAccountReconciler reconciles a DatabaseAccount object.
@@ -63,6 +65,11 @@ type DatabaseAccountReconciler struct {
 func (r *DatabaseAccountReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
+	logger.V(1).Info("Reconcile",
+		"req.Name", req.Name,
+		"req.Namespace", req.Namespace,
+	)
+
 	var dbAccount dbov1.DatabaseAccount
 	if err := r.Get(ctx, req.NamespacedName, &dbAccount); err != nil && !apierrors.IsNotFound(err) {
 		logger.Error(err, "unable to retrieve database account")
@@ -79,7 +86,12 @@ func (r *DatabaseAccountReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return result, err
 	}
 
-	// logger.V(1).Info("entering switch", "stage", dbAccount.Status.Stage)
+	logger.V(1).Info("entering switch",
+		"stage", dbAccount.Status.Stage,
+		"resourceVersion", dbAccount.ResourceVersion,
+		"generation", dbAccount.Generation,
+		"dump", fmt.Sprintf("%+v", dbAccount),
+	)
 
 	if r.Config.Debug.ReconcileSleep > 0 {
 		//nolint:gosec,gomnd // simple random for use when debugging.
@@ -214,7 +226,7 @@ func (r *DatabaseAccountReconciler) stageZero(
 		return ctrl.Result{}, err
 	}
 
-	// logger.V(1).Info("return result[ok]")
+	logger.V(1).Info("return result[ok]")
 	return ctrl.Result{}, nil
 }
 
@@ -476,73 +488,74 @@ func (r *DatabaseAccountReconciler) setSecretKV(secret *corev1.Secret, key, valu
 	secret.Data[key] = []byte(value)
 }
 
-// func (r *DatabaseAccountReconciler) reconcileSecret(secretObj client.Object) []reconcile.Request {
-// 	ctx := context.Background()
-// 	logger := log.FromContext(ctx)
-// 	requests := []reconcile.Request{}
+// reconcileSecret handles secrets created along side databaseaccount resources.
+func (r *DatabaseAccountReconciler) reconcileSecret(ctx context.Context, secretObj client.Object) []reconcile.Request {
+	logger := log.FromContext(ctx)
+	requests := []reconcile.Request{}
 
-// 	name := types.NamespacedName{
-// 		Name:      secretObj.GetName(),
-// 		Namespace: secretObj.GetNamespace(),
-// 	}
-// 	secret, secretErr := secretGetByName(ctx, r, name)
-// 	if secretErr != nil {
-// 		return requests
-// 	}
+	name := types.NamespacedName{
+		Name:      secretObj.GetName(),
+		Namespace: secretObj.GetNamespace(),
+	}
+	secret, secretErr := secretGetByName(ctx, r, name)
+	if secretErr != nil {
+		return requests
+	}
 
-// 	if !strings.EqualFold(string(secret.Type), secretType) {
-// 		return requests
-// 	}
-// 	// logger.Info("call():reconcileSecret",
-// 	// 	"name", secretObj.GetName(),
-// 	// 	"namespace", secretObj.GetNamespace(),
-// 	// 	"managedFields", secretObj.GetManagedFields(),
-// 	// 	"secretType", secret.Type,
-// 	// )
+	if !strings.EqualFold(string(secret.Type), secretType) {
+		return requests
+	}
 
-// 	if secret.ObjectMeta.DeletionTimestamp.IsZero() {
-// 		if !controllerutil.ContainsFinalizer(secret, finalizerName) {
-// 			// logger.V(1).Info("adding finalizer to DatabaseAccount")
-// 			controllerutil.AddFinalizer(secret, finalizerName)
-// 			if err := r.Update(ctx, secret); err != nil {
-// 				return requests
-// 			}
-// 		}
-// 	} else {
-// 		// object is being deleted
-// 		if controllerutil.ContainsFinalizer(secret, finalizerName) {
-// 			// our finalizer is present, so lets handle any external dependency
-// 			if dbName, ok := secret.Data[accountsvr.DatabaseKeyDatabase]; ok {
-// 				logger.Info("Database removal triggered by secret delete", "databaseName", dbName)
+	logger.Info("call():reconcileSecret",
+		"name", secretObj.GetName(),
+		"namespace", secretObj.GetNamespace(),
+		"managedFields", secretObj.GetManagedFields(),
+		"secretType", secret.Type,
+	)
 
-// 				if len(secret.GetOwnerReferences()) > 0 {
-// 					ownerRef := secret.GetOwnerReferences()[0]
-// 					requests = append(requests, reconcile.Request{
-// 						NamespacedName: types.NamespacedName{
-// 							Namespace: secret.GetNamespace(),
-// 							Name:      ownerRef.Name,
-// 						},
-// 					})
-// 				}
+	if secret.ObjectMeta.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(secret, finalizerName) {
+			// logger.V(1).Info("adding finalizer to DatabaseAccount")
+			controllerutil.AddFinalizer(secret, finalizerName)
+			if err := r.Update(ctx, secret); err != nil {
+				return requests
+			}
+		}
+	} else {
+		// object is being deleted
+		if controllerutil.ContainsFinalizer(secret, finalizerName) {
+			// our finalizer is present, so lets handle any external dependency
+			if dbName, ok := secret.Data[accountsvr.DatabaseKeyDatabase]; ok {
+				logger.Info("Database removal triggered by secret delete", "databaseName", dbName)
 
-// 				if err := r.deleteDatabase(ctx, string(dbName)); err != nil {
-// 					return requests
-// 				}
-// 			}
+				if len(secret.GetOwnerReferences()) > 0 {
+					ownerRef := secret.GetOwnerReferences()[0]
+					requests = append(requests, reconcile.Request{
+						NamespacedName: types.NamespacedName{
+							Namespace: secret.GetNamespace(),
+							Name:      ownerRef.Name,
+						},
+					})
+				}
 
-// 			// remove our finalizer from the list and update it.
-// 			controllerutil.RemoveFinalizer(secret, finalizerName)
-// 			if err := r.Update(ctx, secret); err != nil {
-// 				return requests
-// 			}
-// 		}
+				if err := r.deleteDatabase(ctx, string(dbName)); err != nil {
+					return requests
+				}
+			}
 
-// 		// Stop reconciliation as the item is being deleted
-// 		return requests
-// 	}
+			// remove our finalizer from the list and update it.
+			controllerutil.RemoveFinalizer(secret, finalizerName)
+			if err := r.Update(ctx, secret); err != nil {
+				return requests
+			}
+		}
 
-// 	return requests
-// }
+		// Stop reconciliation as the item is being deleted
+		return requests
+	}
+
+	return requests
+}
 
 // // SetupWithManager sets up the controller with the Manager.
 // func (r *DatabaseAccountReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -560,6 +573,13 @@ func (r *DatabaseAccountReconciler) setSecretKV(secret *corev1.Secret, key, valu
 // SetupWithManager sets up the controller with the Manager.
 func (r *DatabaseAccountReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
+		Named("database_operator").
 		For(&dbov1.DatabaseAccount{}).
+		Owns(&corev1.Secret{}).
+		// Watches(
+		// 	&corev1.Secret{},
+		// 	handler.EnqueueRequestsFromMapFunc(r.reconcileSecret),
+		// 	builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		// ).
 		Complete(r)
 }
