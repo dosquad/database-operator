@@ -7,7 +7,7 @@ replace k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20230501164219-8b0f38b
 require (
 	github.com/jackc/pgx/v5 v5.4.2
 	github.com/oklog/ulid/v2 v2.1.0
-	github.com/onsi/ginkgo/v2 v2.10.0
+	github.com/onsi/ginkgo/v2 v2.11.0
 	github.com/onsi/gomega v1.27.8
 	github.com/sethvargo/go-password v0.2.0
 	k8s.io/api v0.27.2
@@ -59,7 +59,7 @@ require (
 	golang.org/x/crypto v0.9.0 // indirect
 	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/oauth2 v0.8.0 // indirect
-	golang.org/x/sys v0.8.0 // indirect
+	golang.org/x/sys v0.9.0 // indirect
 	golang.org/x/term v0.8.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
