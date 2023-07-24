@@ -11,7 +11,7 @@ require (
 	github.com/onsi/gomega v1.27.8
 	github.com/sethvargo/go-password v0.2.0
 	k8s.io/api v0.27.3
-	k8s.io/apimachinery v0.27.3
+	k8s.io/apimachinery v0.27.4
 	k8s.io/client-go v0.27.3
 	sigs.k8s.io/controller-runtime v0.15.0
 )
