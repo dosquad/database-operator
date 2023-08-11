@@ -258,7 +258,7 @@ func (s *Server) CreateSchema(ctx context.Context, schemaName, roleName string) 
 	return nil
 }
 
-func (s *Server) CopyConfigToSecret(secret *corev1.Secret) {
+func (s *Server) CopyInitConfigToSecret(secret *corev1.Secret) {
 	if secret.Data == nil {
 		secret.Data = make(map[string][]byte)
 	}

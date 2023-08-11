@@ -27,10 +27,15 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
+    - description: name of the database account
+      jsonPath: .status.name
+      name: Name
+      priority: 1
+      type: string
     name: v1
     schema:
       openAPIV3Schema:
-        description: DatabaseAccount is the Schema for the databaseaccounts API
+        description: DatabaseAccount is the Schema for the databaseaccounts API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -119,6 +124,7 @@ spec:
                 - DatabaseCreate
                 - Error
                 - Ready
+                - Terminating
                 type: string
             type: object
         type: object

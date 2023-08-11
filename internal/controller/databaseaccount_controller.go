@@ -26,14 +26,19 @@ import (
 
 	"github.com/dosquad/database-operator/accountsvr"
 	dbov1 "github.com/dosquad/database-operator/api/v1"
+	"github.com/dosquad/database-operator/internal/helper"
+	"github.com/go-logr/logr"
+	"github.com/oklog/ulid/v2"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -64,6 +69,9 @@ type DatabaseAccountReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *DatabaseAccountReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
+	callID := ulid.Make().String()
+	logger = logger.WithValues("callID", callID)
+	ctx = log.IntoContext(ctx, logger)
 
 	logger.V(1).Info("Reconcile",
 		"req.Name", req.Name,
@@ -82,15 +90,15 @@ func (r *DatabaseAccountReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, nil
 	}
 
-	if ok, result, err := r.handleFinalizers(ctx, &dbAccount); ok {
-		return result, err
+	if ok, err := r.handleFinalizers(ctx, &dbAccount); ok {
+		return ctrl.Result{}, err
 	}
 
 	logger.V(1).Info("entering switch",
 		"stage", dbAccount.Status.Stage,
 		"resourceVersion", dbAccount.ResourceVersion,
 		"generation", dbAccount.Generation,
-		"dump", fmt.Sprintf("%+v", dbAccount),
+		// "dump", fmt.Sprintf("%+v", dbAccount),
 	)
 
 	if r.Config.Debug.ReconcileSleep > 0 {
@@ -113,6 +121,8 @@ func (r *DatabaseAccountReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return r.stageReady(ctx, &dbAccount)
 	case dbov1.ErrorStage:
 		return r.stageError(ctx, &dbAccount)
+	case dbov1.TerminatingStage:
+		return r.stageTerminating(ctx, &dbAccount)
 	default:
 		logger.Error(nil, "Unknown error type", "stage_value", dbAccount.Status.Stage)
 	}
@@ -125,38 +135,42 @@ func (r *DatabaseAccountReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 func (r *DatabaseAccountReconciler) handleFinalizers(
 	ctx context.Context,
 	dbAccount *dbov1.DatabaseAccount,
-) (bool, ctrl.Result, error) {
-	//nolint:nestif // it's pretty readable.
+) (bool, error) {
+	logger := log.FromContext(ctx)
+
 	if dbAccount.ObjectMeta.DeletionTimestamp.IsZero() {
-		if !controllerutil.ContainsFinalizer(dbAccount, finalizerName) {
-			// logger.V(1).Info("adding finalizer to DatabaseAccount")
+		// object is not being deleted currently, check for and add finalizers
+		if !controllerutil.AddFinalizer(dbAccount, finalizerName) {
+			logger.V(1).Info("added finalizer to DatabaseAccount")
 			controllerutil.AddFinalizer(dbAccount, finalizerName)
 			if err := r.Update(ctx, dbAccount); err != nil {
-				return true, ctrl.Result{}, err
-			}
-		}
-	} else {
-		// object is being deleted
-		if controllerutil.ContainsFinalizer(dbAccount, finalizerName) {
-			// our finalizer is present, so lets handle any external dependency
-			if err := r.deleteExternalResources(ctx, dbAccount); err != nil {
-				// if fail to delete the external dependency here, return with error
-				// so that it can be retried
-				return true, ctrl.Result{}, err
+				return true, err
 			}
 
-			// remove our finalizer from the list and update it.
-			controllerutil.RemoveFinalizer(dbAccount, finalizerName)
-			if err := r.Update(ctx, dbAccount); err != nil {
-				return true, ctrl.Result{}, err
-			}
+			return true, nil
 		}
 
-		// Stop reconciliation as the item is being deleted
-		return true, ctrl.Result{}, nil
+		return false, nil
 	}
 
-	return false, ctrl.Result{}, nil
+	// object is being deleted
+	if controllerutil.ContainsFinalizer(dbAccount, finalizerName) {
+		// our finalizer is present, so lets handle any external dependency
+		if err := r.deleteExternalResources(ctx, dbAccount); err != nil {
+			// if fail to delete the external dependency here, return with error
+			// so that it can be retried
+			return true, err
+		}
+
+		// remove our finalizer from the list and update it.
+		controllerutil.RemoveFinalizer(dbAccount, finalizerName)
+		if err := r.Update(ctx, dbAccount); err != nil {
+			return true, err
+		}
+	}
+
+	// Stop reconciliation as the item is being deleted
+	return true, nil
 }
 
 // deleteExternalResources takes the DatabaseAccount and removes any external resources if required.
@@ -166,7 +180,7 @@ func (r *DatabaseAccountReconciler) deleteExternalResources(
 ) error {
 	logger := log.FromContext(ctx)
 
-	switch dbAccount.Spec.OnDelete {
+	switch dbAccount.GetSpecOnDelete() {
 	case dbov1.OnDeleteDelete:
 		name, err := dbAccount.GetDatabaseName()
 		if err != nil {
@@ -180,7 +194,7 @@ func (r *DatabaseAccountReconciler) deleteExternalResources(
 	return nil
 }
 
-// deleteExternalResources takes the DatabaseAccount and removes any external resources if required.
+// deleteDatabase takes the database name and removes it from the database server.
 func (r *DatabaseAccountReconciler) deleteDatabase(ctx context.Context, name string) error {
 	logger := log.FromContext(ctx)
 
@@ -215,18 +229,34 @@ func (r *DatabaseAccountReconciler) stageZero(
 ) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
+	// if !controllerutil.ContainsFinalizer(dbAccount, finalizerName) {
+	// 	logger.V(1).Info("adding finalizer to DatabaseAccount")
+	// 	if controllerutil.AddFinalizer(dbAccount, finalizerName) {
+	// 		logger.V(1).Info("added finalizer to DatabaseAccount")
+
+	// 		if err := dbAccount.Update(ctx, r); err != nil {
+	// 			logger.V(1).Error(err, "unable to update DatabaseAccount")
+
+	// 			return ctrl.Result{}, err
+	// 		}
+
+	// 		logger.V(1).Info("finalizer added, requeuing.")
+	// 		return reconcile.Result{Requeue: false}, nil
+	// 	}
+	// }
+
 	dbAccount.Status.Stage = dbov1.InitStage
 	if len(dbAccount.Status.Name) == 0 {
 		dbAccount.Status.Name = newDatabaseAccountName(ctx)
 	}
 
 	if err := dbAccount.UpdateStatus(ctx, r); err != nil {
-		logger.V(1).Error(err, "unable to update DatabaseAccount")
+		logger.V(1).Error(err, "unable to update DatabaseAccount Status")
 
 		return ctrl.Result{}, err
 	}
 
-	logger.V(1).Info("return result[ok]")
+	logger.V(1).Info("return result[ok]", "dbAccount", dbAccount)
 	return ctrl.Result{}, nil
 }
 
@@ -246,8 +276,12 @@ func (r *DatabaseAccountReconciler) stageInit(
 			return err
 		}
 
-		r.AccountServer.CopyConfigToSecret(secret)
-		r.setSecretKV(secret, accountsvr.DatabaseKeyUsername, name)
+		r.AccountServer.CopyInitConfigToSecret(secret)
+		setSecretKV(secret, accountsvr.DatabaseKeyUsername, name)
+		if dbAccount.GetSpecOnDelete() != dbov1.OnDeleteRetain {
+			secretAddOwnerRefs(secret, dbAccount)
+		}
+		controllerutil.AddFinalizer(secret, finalizerName)
 
 		return nil
 	})
@@ -313,8 +347,8 @@ func (r *DatabaseAccountReconciler) stageUserCreate(
 
 		r.Recorder.NormalEvent(dbAccount, ReasonUserCreate, "User created")
 
-		r.setSecretKV(secret, accountsvr.DatabaseKeyUsername, usr)
-		r.setSecretKV(secret, accountsvr.DatabaseKeyPassword, pw)
+		setSecretKV(secret, accountsvr.DatabaseKeyUsername, usr)
+		setSecretKV(secret, accountsvr.DatabaseKeyPassword, pw)
 
 		return nil
 	}); err != nil {
@@ -360,8 +394,8 @@ func (r *DatabaseAccountReconciler) stageDatabaseCreate(
 	case ok:
 		r.Recorder.WarningEvent(dbAccount, ReasonDatabaseCreate, "Database already exists")
 		if err := secretRun(ctx, r, r, r.AccountServer, dbAccount, func(secret *corev1.Secret) error {
-			r.setSecretKV(secret, accountsvr.DatabaseKeyDatabase, dbName)
-			r.setSecretKV(secret, accountsvr.DatabaseKeyDSN, accountsvr.GenerateDSN(secret))
+			setSecretKV(secret, accountsvr.DatabaseKeyDatabase, dbName)
+			setSecretKV(secret, accountsvr.DatabaseKeyDSN, accountsvr.GenerateDSN(secret))
 
 			boolTrue := true
 			secret.Immutable = &boolTrue
@@ -379,8 +413,8 @@ func (r *DatabaseAccountReconciler) stageDatabaseCreate(
 		}
 
 		if secretErr := secretRun(ctx, r, r, r.AccountServer, dbAccount, func(secret *corev1.Secret) error {
-			r.setSecretKV(secret, accountsvr.DatabaseKeyDatabase, dbName)
-			r.setSecretKV(secret, accountsvr.DatabaseKeyDSN, accountsvr.GenerateDSN(secret))
+			setSecretKV(secret, accountsvr.DatabaseKeyDatabase, dbName)
+			setSecretKV(secret, accountsvr.DatabaseKeyDSN, accountsvr.GenerateDSN(secret))
 
 			boolTrue := true
 			secret.Immutable = &boolTrue
@@ -403,10 +437,10 @@ func (r *DatabaseAccountReconciler) stageDatabaseCreate(
 	}
 
 	r.Recorder.NormalEvent(dbAccount, ReasonReady, "Ready to use")
-	logger.Info("Record is marked as ready",
-		"databaseUsername", dbAccount.Status.Name,
-		"secretName", dbAccount.GetSecretName(),
-	)
+	// logger.Info("Record is marked as ready",
+	// 	"databaseUsername", dbAccount.Status.Name,
+	// 	"secretName", dbAccount.GetSecretName(),
+	// )
 
 	// logger.V(1).Info("return result[ok]")
 	return ctrl.Result{}, nil
@@ -436,8 +470,8 @@ func (r *DatabaseAccountReconciler) stageReady(
 	onDeleteUpdate := false
 	if err := secretRun(ctx, r, r, r.AccountServer, dbAccount, func(secret *corev1.Secret) error {
 		// logger.V(1).Info("Checking database account spec")
-		// logger.V(1).Info("Database account spec", "dbAccount.Spec.OnDelete", dbAccount.Spec.OnDelete)
-		switch dbAccount.Spec.OnDelete {
+		// logger.V(1).Info("Database account spec", "dbAccount.Spec.OnDelete", dbAccount.GetSpecOnDelete())
+		switch dbAccount.GetSpecOnDelete() {
 		case dbov1.OnDeleteDelete:
 			if len(secret.ObjectMeta.OwnerReferences) != 1 {
 				// logger.V(1).Info("Database account marked for deletion but secret does not have ownerreferences")
@@ -463,6 +497,11 @@ func (r *DatabaseAccountReconciler) stageReady(
 		logger.Info("Database account onDelete changed, updated secret")
 	}
 
+	logger.Info("Record is marked as ready",
+		"databaseUsername", dbAccount.Status.Name,
+		"secretName", dbAccount.GetSecretName(),
+	)
+
 	// logger.V(1).Info("return result[ok]")
 	return ctrl.Result{}, nil
 }
@@ -478,19 +517,24 @@ func (r *DatabaseAccountReconciler) stageError(
 	return ctrl.Result{}, nil
 }
 
-func (r *DatabaseAccountReconciler) setSecretKV(secret *corev1.Secret, key, value string) {
-	if secret.StringData == nil {
-		secret.StringData = make(map[string]string)
+func (r *DatabaseAccountReconciler) stageTerminating(
+	ctx context.Context,
+	dbAccount *dbov1.DatabaseAccount,
+) (ctrl.Result, error) {
+	dbName := dbAccount.Status.Name
+	if err := r.deleteDatabase(ctx, dbName.String()); err != nil {
+		return ctrl.Result{}, err
 	}
-	if secret.Data == nil {
-		secret.Data = make(map[string][]byte)
-	}
-	secret.Data[key] = []byte(value)
+
+	return ctrl.Result{}, nil
 }
 
 // reconcileSecret handles secrets created along side databaseaccount resources.
 func (r *DatabaseAccountReconciler) reconcileSecret(ctx context.Context, secretObj client.Object) []reconcile.Request {
 	logger := log.FromContext(ctx)
+	callID := ulid.Make().String()
+	logger = logger.WithValues("callID", callID)
+	ctx = log.IntoContext(ctx, logger)
 	requests := []reconcile.Request{}
 
 	name := types.NamespacedName{
@@ -506,7 +550,7 @@ func (r *DatabaseAccountReconciler) reconcileSecret(ctx context.Context, secretO
 		return requests
 	}
 
-	logger.Info("call():reconcileSecret",
+	logger.V(1).Info("call():reconcileSecret",
 		"name", secretObj.GetName(),
 		"namespace", secretObj.GetNamespace(),
 		"managedFields", secretObj.GetManagedFields(),
@@ -514,43 +558,108 @@ func (r *DatabaseAccountReconciler) reconcileSecret(ctx context.Context, secretO
 	)
 
 	if secret.ObjectMeta.DeletionTimestamp.IsZero() {
-		if !controllerutil.ContainsFinalizer(secret, finalizerName) {
-			// logger.V(1).Info("adding finalizer to DatabaseAccount")
-			controllerutil.AddFinalizer(secret, finalizerName)
-			if err := r.Update(ctx, secret); err != nil {
-				return requests
+		// object is not being deleted, return early
+		return requests
+	}
+
+	// object is being deleted
+	if controllerutil.ContainsFinalizer(secret, finalizerName) {
+		// our finalizer is present, so lets handle any external dependency
+		requests = append(requests,
+			r.reconcileSecretExternalDependency(ctx, logger, secret)...,
+		)
+	}
+
+	ownerRefs := secret.GetOwnerReferences()
+	for _, ownerRef := range ownerRefs {
+		if strings.EqualFold(ownerRef.Kind, dbov1.KindDatabaseAccount) {
+			if err := r.setStageOnDatabaseAccount(
+				ctx,
+				ctrl.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      ownerRef.Name,
+						Namespace: secret.GetNamespace(),
+					},
+				},
+				dbov1.TerminatingStage,
+			); err != nil {
+				logger.V(1).Error(err, "Unable to update DatabaseAccount status")
 			}
 		}
-	} else {
-		// object is being deleted
-		if controllerutil.ContainsFinalizer(secret, finalizerName) {
-			// our finalizer is present, so lets handle any external dependency
-			if dbName, ok := secret.Data[accountsvr.DatabaseKeyDatabase]; ok {
-				logger.Info("Database removal triggered by secret delete", "databaseName", dbName)
+	}
 
-				if len(secret.GetOwnerReferences()) > 0 {
-					ownerRef := secret.GetOwnerReferences()[0]
-					requests = append(requests, reconcile.Request{
-						NamespacedName: types.NamespacedName{
-							Namespace: secret.GetNamespace(),
-							Name:      ownerRef.Name,
-						},
-					})
-				}
+	// Stop reconciliation as the item is being deleted
+	return requests
+}
 
-				if err := r.deleteDatabase(ctx, string(dbName)); err != nil {
-					return requests
-				}
-			}
+func (r *DatabaseAccountReconciler) setStageOnDatabaseAccount(
+	ctx context.Context,
+	req ctrl.Request,
+	stage dbov1.DatabaseAccountCreateStage,
+) error {
+	logger := log.FromContext(ctx)
 
-			// remove our finalizer from the list and update it.
-			controllerutil.RemoveFinalizer(secret, finalizerName)
-			if err := r.Update(ctx, secret); err != nil {
-				return requests
-			}
+	var dbAccount dbov1.DatabaseAccount
+	if err := r.Get(ctx, req.NamespacedName, &dbAccount); err != nil && !apierrors.IsNotFound(err) {
+		logger.Error(err, "unable to retrieve database account")
+
+		return err
+	} else if apierrors.IsNotFound(err) {
+		// record is deleted
+		logger.V(1).Info("record is deleted")
+
+		return nil
+	}
+
+	return dbAccount.SetStage(ctx, r, stage)
+}
+
+// func (r *DatabaseAccountReconciler) addSecretFinalizer(
+// 	ctx context.Context,
+// 	logger logr.Logger,
+// 	secret *corev1.Secret,
+// ) error {
+// 	if !controllerutil.ContainsFinalizer(secret, finalizerName) {
+// 		logger.V(1).Info("adding finalizer to Secret")
+// 		controllerutil.AddFinalizer(secret, finalizerName)
+// 		if err := r.Update(ctx, secret); err != nil {
+// 			return err
+// 		}
+// 	}
+
+// 	return nil
+// }
+
+func (r *DatabaseAccountReconciler) reconcileSecretExternalDependency(
+	ctx context.Context,
+	logger logr.Logger,
+	secret *corev1.Secret,
+) []reconcile.Request {
+	requests := []reconcile.Request{}
+
+	// our finalizer is present, so lets handle any external dependency
+	if dbName, ok := secret.Data[accountsvr.DatabaseKeyDatabase]; ok {
+		logger.V(1).Info("returning request for owner reference to be reconciled", "databaseName", dbName)
+
+		if len(secret.GetOwnerReferences()) > 0 {
+			ownerRef := secret.GetOwnerReferences()[0]
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: secret.GetNamespace(),
+					Name:      ownerRef.Name,
+				},
+			})
 		}
 
-		// Stop reconciliation as the item is being deleted
+		// if err := r.deleteDatabase(ctx, string(dbName)); err != nil {
+		// 	return requests
+		// }
+	}
+
+	logger.V(1).Info("removing finalizer from DatabaseAccount")
+	// remove our finalizer from the list and update it.
+	controllerutil.RemoveFinalizer(secret, finalizerName)
+	if err := r.Update(ctx, secret); err != nil {
 		return requests
 	}
 
@@ -572,14 +681,20 @@ func (r *DatabaseAccountReconciler) reconcileSecret(ctx context.Context, secretO
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *DatabaseAccountReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	logCtr, err := GetLogConstructor(mgr, &dbov1.DatabaseAccount{})
+	if err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("database_operator").
 		For(&dbov1.DatabaseAccount{}).
 		Owns(&corev1.Secret{}).
-		// Watches(
-		// 	&corev1.Secret{},
-		// 	handler.EnqueueRequestsFromMapFunc(r.reconcileSecret),
-		// 	builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		// ).
+		WithLogConstructor(logCtr).
+		Watches(
+			&corev1.Secret{},
+			helper.EnqueueRequestsFromMapFunc(r.reconcileSecret),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
 		Complete(r)
 }

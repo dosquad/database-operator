@@ -34,7 +34,7 @@ type DatabaseAccountSpec struct {
 
 	// OnDelete specifies if the database should be removed when the user is removed.
 	//+optional
-	//+kubebuilder:default:=delete
+	// +kubebuilder:default:=delete
 	OnDelete DatabaseAccountOnDelete `json:"onDelete,omitempty"`
 
 	// Name is the basename used for the resource, if not specified a UUID will be used.
@@ -93,13 +93,14 @@ type DatabaseAccountStatus struct {
 	Ready bool `json:"ready,omitempty"`
 }
 
-// DatabaseAccount is the Schema for the databaseaccounts API
-//
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Stage",type=string,JSONPath=`.status.stage`,description="deployment stage for database account"
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.ready`,description="ready status of database account"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:printcolumn:name="Name",priority=1,type=string,JSONPath=`.status.name`,description="name of the database account"
+
+// DatabaseAccount is the Schema for the databaseaccounts API.
 type DatabaseAccount struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -139,12 +140,40 @@ func (d *DatabaseAccount) GetDatabaseName() (string, error) {
 	return d.Status.Name.String(), nil
 }
 
+func (d *DatabaseAccount) GetSpecOnDelete() DatabaseAccountOnDelete {
+	switch d.Spec.OnDelete {
+	case OnDeleteRetain:
+		return OnDeleteRetain
+	case OnDeleteDelete:
+		return OnDeleteDelete
+	}
+
+	return OnDeleteDelete
+}
+
 func (d *DatabaseAccount) UpdateStatus(ctx context.Context, r client.StatusClient) error {
 	return r.Status().Update(ctx, d)
 }
 
-func (d *DatabaseAccount) Update(ctx context.Context, r client.Client) error {
+func (d *DatabaseAccount) Update(ctx context.Context, r client.Writer) error {
 	return r.Update(ctx, d)
+}
+
+func (d *DatabaseAccount) SetStage(ctx context.Context, r client.StatusClient, stage DatabaseAccountCreateStage) error {
+	if d.Status.Stage != stage {
+		d.Status.Stage = stage
+
+		switch d.Status.Stage {
+		case UnknownStage, InitStage, UserCreateStage, DatabaseCreateStage, ErrorStage, ReadyStage:
+			// do nothing
+		case TerminatingStage:
+			d.Status.Ready = false
+		}
+
+		return r.Status().Update(ctx, d)
+	}
+
+	return nil
 }
 
 // DatabaseAccountList contains a list of DatabaseAccount

@@ -1,5 +1,10 @@
 package v1
 
+const (
+	// KindDatabaseAccount is the kind of DatabaseAccount.
+	KindDatabaseAccount = "DatabaseAccount"
+)
+
 // DatabaseAccountOnDelete is the options that can be set for onDelete.
 // +kubebuilder:validation:Enum=retain;delete
 type DatabaseAccountOnDelete string
@@ -17,7 +22,7 @@ const (
 )
 
 // DatabaseAccountCreateStage is the stage the account creation is up to.
-// +kubebuilder:validation:Enum=Init;UserCreate;DatabaseCreate;Error;Ready
+// +kubebuilder:validation:Enum=Init;UserCreate;DatabaseCreate;Error;Ready;Terminating
 type DatabaseAccountCreateStage string
 
 func (d DatabaseAccountCreateStage) String() string {
@@ -42,4 +47,7 @@ const (
 
 	// ReadyStage is when the account is ready to be used.
 	ReadyStage DatabaseAccountCreateStage = "Ready"
+
+	// TerminatingStage is when the account is being removed.
+	TerminatingStage DatabaseAccountCreateStage = "Terminating"
 )

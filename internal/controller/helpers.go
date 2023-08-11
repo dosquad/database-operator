@@ -17,16 +17,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-const (
-	// secretType is the type used to indicate a secret has been created by this operator.
-	//
-	//nolint:gosec // not credentials.
-	secretType = `dosquad.github.io/database-account`
-)
+const ()
 
 // newDatabaseAccountName returns a newly generated database/username.
 func newDatabaseAccountName(_ context.Context) v1.PostgreSQLResourceName {
 	return v1.PostgreSQLResourceName(strings.ToLower("k8s_" + ulid.Make().String()))
+}
+
+func setSecretKV(secret *corev1.Secret, key, value string) {
+	if secret.StringData == nil {
+		secret.StringData = make(map[string]string)
+	}
+	if secret.Data == nil {
+		secret.Data = make(map[string][]byte)
+	}
+	secret.Data[key] = []byte(value)
 }
 
 type secretFunc func(secret *corev1.Secret) error
@@ -43,7 +48,7 @@ func secretRun(
 
 	secret, secretErr := secretGet(ctx, r, dbAccount)
 	if errors.Is(secretErr, ErrNewSecret) {
-		accountSvr.CopyConfigToSecret(secret)
+		accountSvr.CopyInitConfigToSecret(secret)
 		if err := w.Create(ctx, secret); err != nil {
 			logger.V(1).Error(err, "unable to create secret")
 
@@ -64,7 +69,11 @@ func secretRun(
 	// logger.V(1).Info("Checksum Comparison", "preChecksum", preChecksum, "postChecksum", postChecksum)
 
 	if preChecksum != postChecksum {
-		logger.V(1).Info("Secret updated", "preChecksum", preChecksum, "postChecksum", postChecksum)
+		logger.V(1).Info("Secret updated",
+			"generation", secret.Generation,
+			"resourceVersion", secret.ResourceVersion,
+			"preChecksum", preChecksum, "postChecksum", postChecksum,
+		)
 		if err := w.Update(ctx, secret); err != nil {
 			logger.V(1).Error(err, "unable to update secret")
 
@@ -86,8 +95,13 @@ func secretGetByName(ctx context.Context, r client.Reader, name types.Namespaced
 }
 
 func secretGet(ctx context.Context, r client.Reader, dbAccount *v1.DatabaseAccount) (*corev1.Secret, error) {
+	logger := log.FromContext(ctx)
+
 	secret := &corev1.Secret{}
 	if err := r.Get(ctx, dbAccount.GetSecretName(), secret); apierrors.IsNotFound(err) {
+		logger.V(1).Info("call:secretGet()",
+			"dbAccount.Spec.OnDelete", dbAccount.GetSpecOnDelete(),
+		)
 		// user := uuid.NewUUID()
 		secret = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -100,7 +114,7 @@ func secretGet(ctx context.Context, r client.Reader, dbAccount *v1.DatabaseAccou
 			Data:       map[string][]byte{},
 			Type:       secretType,
 		}
-		if dbAccount.Spec.OnDelete == v1.OnDeleteDelete {
+		if dbAccount.GetSpecOnDelete() == v1.OnDeleteDelete {
 			secretAddOwnerRefs(secret, dbAccount)
 		}
 
