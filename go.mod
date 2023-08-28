@@ -9,7 +9,7 @@ require (
 	github.com/go-logr/logr v1.2.4
 	github.com/jackc/pgx/v5 v5.4.3
 	github.com/oklog/ulid/v2 v2.1.0
-	github.com/onsi/ginkgo/v2 v2.11.0
+	github.com/onsi/ginkgo/v2 v2.12.0
 	github.com/onsi/gomega v1.27.10
 	github.com/sethvargo/go-password v0.2.0
 	k8s.io/api v0.28.0
