@@ -3,6 +3,9 @@ package v1
 const (
 	// KindDatabaseAccount is the kind of DatabaseAccount.
 	KindDatabaseAccount = "DatabaseAccount"
+
+	// DefaultRelayImage is the default image used for the relay.
+	DefaultRelayImage = "edoburu/pgbouncer:1.20.1-p0"
 )
 
 // DatabaseAccountOnDelete is the options that can be set for onDelete.
@@ -22,7 +25,7 @@ const (
 )
 
 // DatabaseAccountCreateStage is the stage the account creation is up to.
-// +kubebuilder:validation:Enum=Init;UserCreate;DatabaseCreate;Error;Ready;Terminating
+// +kubebuilder:validation:Enum=Init;UserCreate;DatabaseCreate;RelayCreate;Error;Ready;Terminating
 type DatabaseAccountCreateStage string
 
 func (d DatabaseAccountCreateStage) String() string {
@@ -41,6 +44,9 @@ const (
 
 	// DatabaseCreateStage is the step where the account creation has been started.
 	DatabaseCreateStage DatabaseAccountCreateStage = "DatabaseCreate"
+
+	// RelayCreateStage is the step where the account creation has been started.
+	RelayCreateStage DatabaseAccountCreateStage = "RelayCreate"
 
 	// ErrorStage is when the account has failed and won't be completed without changes.
 	ErrorStage DatabaseAccountCreateStage = "Error"

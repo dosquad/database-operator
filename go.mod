@@ -1,6 +1,6 @@
 module github.com/dosquad/database-operator
 
-go 1.20
+go 1.21
 
 //nolint:gomoddirectives // needed during change over of gnostic.
 replace k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20230501164219-8b0f38b5fd1f

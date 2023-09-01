@@ -333,6 +333,9 @@ issues:
     - linters:
         - lll
       source: '^//\s*\+kubebuilder:'
+    - linters:
+        - godot
+      source: '^//\s*\+optional'
     - path: "api/v1/"
       linters:
         - gochecknoinits

@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 
+	dbov1 "github.com/dosquad/database-operator/api/v1"
 	"github.com/jackc/pgx/v5"
 	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
@@ -33,22 +34,24 @@ const (
 )
 
 type Server struct {
-	connString string
+	connString dbov1.PostgreSQLDSN
 	conn       *pgx.Conn
 }
 
 const (
-	DatabaseKeyDSN      = "dsn"
-	DatabaseKeyUsername = "username"
-	DatabaseKeyPassword = "password"
-	DatabaseKeyHost     = "host"
-	DatabaseKeyPort     = "port"
-	DatabaseKeySchema   = "schema"
-	DatabaseKeyDatabase = "database"
-	DatabaseKeyOnDelete = "onDelete"
+	DatabaseKeyDSN            = "dsn"
+	DatabaseKeyUsername       = "username"
+	DatabaseKeyPassword       = "password"
+	DatabaseKeyHost           = "host"
+	DatabaseKeyPort           = "port"
+	DatabaseKeySchema         = "schema"
+	DatabaseKeyDatabase       = "database"
+	DatabaseKeyOnDelete       = "onDelete"
+	DatabaseKeyPGBouncerConf  = "pgbouncer.ini"
+	DatabaseKeyPGBouncerUsers = "userlist.txt"
 )
 
-func NewServer(ctx context.Context, connString string) (*Server, error) {
+func NewServer(ctx context.Context, connString dbov1.PostgreSQLDSN) (*Server, error) {
 	s := &Server{
 		connString: connString,
 	}
@@ -85,7 +88,7 @@ func (s *Server) Connect(ctx context.Context) error {
 		}
 	}
 
-	conn, err := pgx.Connect(ctx, s.connString)
+	conn, err := pgx.Connect(ctx, s.connString.String())
 	if err != nil {
 		logger.Error(err, "unable to connect to the database")
 
@@ -266,16 +269,12 @@ func (s *Server) CopyInitConfigToSecret(secret *corev1.Secret) {
 	secret.Data[DatabaseKeyPort] = []byte(fmt.Sprintf("%d", s.conn.Config().Port))
 }
 
-func getSecretKV(secret *corev1.Secret, key string) string {
+func GetSecretKV(secret *corev1.Secret, key string) string {
 	if secret.Data == nil {
 		secret.Data = make(map[string][]byte)
 	}
 	if secret.StringData == nil {
 		secret.StringData = make(map[string]string)
-	}
-
-	if v, ok := secret.Data[key]; ok {
-		return string(v)
 	}
 
 	if v, ok := secret.Data[key]; ok {
@@ -288,20 +287,20 @@ func getSecretKV(secret *corev1.Secret, key string) string {
 func GenerateDSN(secret *corev1.Secret) string {
 	var host string
 
-	if len(getSecretKV(secret, DatabaseKeyPort)) > 0 {
-		host = fmt.Sprintf("%s:%s", getSecretKV(secret, DatabaseKeyHost), getSecretKV(secret, DatabaseKeyPort))
+	if len(GetSecretKV(secret, DatabaseKeyPort)) > 0 {
+		host = fmt.Sprintf("%s:%s", GetSecretKV(secret, DatabaseKeyHost), GetSecretKV(secret, DatabaseKeyPort))
 	} else {
-		host = getSecretKV(secret, DatabaseKeyHost)
+		host = GetSecretKV(secret, DatabaseKeyHost)
 	}
 
 	u := &url.URL{
 		User: url.UserPassword(
-			getSecretKV(secret, DatabaseKeyUsername),
-			getSecretKV(secret, DatabaseKeyPassword),
+			GetSecretKV(secret, DatabaseKeyUsername),
+			GetSecretKV(secret, DatabaseKeyPassword),
 		),
 		Host:   host,
 		Scheme: "postgres",
-		Path:   getSecretKV(secret, DatabaseKeyDatabase),
+		Path:   GetSecretKV(secret, DatabaseKeyDatabase),
 	}
 
 	return u.String()

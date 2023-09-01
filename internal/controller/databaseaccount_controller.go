@@ -117,6 +117,8 @@ func (r *DatabaseAccountReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return r.stageUserCreate(ctx, &dbAccount)
 	case dbov1.DatabaseCreateStage:
 		return r.stageDatabaseCreate(ctx, &dbAccount)
+	case dbov1.RelayCreateStage:
+		return r.stageRelayCreate(ctx, &dbAccount)
 	case dbov1.ReadyStage:
 		return r.stageReady(ctx, &dbAccount)
 	case dbov1.ErrorStage:
@@ -247,7 +249,7 @@ func (r *DatabaseAccountReconciler) stageZero(
 
 	dbAccount.Status.Stage = dbov1.InitStage
 	if len(dbAccount.Status.Name) == 0 {
-		dbAccount.Status.Name = newDatabaseAccountName(ctx)
+		dbAccount.Status.Name = NewDatabaseAccountName(ctx)
 	}
 
 	if err := dbAccount.UpdateStatus(ctx, r); err != nil {
@@ -266,7 +268,7 @@ func (r *DatabaseAccountReconciler) stageInit(
 ) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	secretErr := secretRun(ctx, r, r, r.AccountServer, dbAccount, func(secret *corev1.Secret) error {
+	secretErr := SecretRun(ctx, r, r, r.AccountServer, dbAccount, func(secret *corev1.Secret) error {
 		if secret.Immutable != nil && *secret.Immutable {
 			return ErrSecretImmutable
 		}
@@ -277,9 +279,9 @@ func (r *DatabaseAccountReconciler) stageInit(
 		}
 
 		r.AccountServer.CopyInitConfigToSecret(secret)
-		setSecretKV(secret, accountsvr.DatabaseKeyUsername, name)
+		SetSecretKV(secret, accountsvr.DatabaseKeyUsername, name)
 		if dbAccount.GetSpecOnDelete() != dbov1.OnDeleteRetain {
-			secretAddOwnerRefs(secret, dbAccount)
+			SecretAddOwnerRefs(secret, dbAccount)
 		}
 		controllerutil.AddFinalizer(secret, finalizerName)
 
@@ -328,7 +330,7 @@ func (r *DatabaseAccountReconciler) stageUserCreate(
 
 	r.Recorder.NormalEvent(dbAccount, ReasonUserCreate, "Creating database user")
 
-	if err := secretRun(ctx, r, r, r.AccountServer, dbAccount, func(secret *corev1.Secret) error {
+	if err := SecretRun(ctx, r, r, r.AccountServer, dbAccount, func(secret *corev1.Secret) error {
 		name, err := dbAccount.GetDatabaseName()
 		if err != nil {
 			return err
@@ -347,8 +349,8 @@ func (r *DatabaseAccountReconciler) stageUserCreate(
 
 		r.Recorder.NormalEvent(dbAccount, ReasonUserCreate, "User created")
 
-		setSecretKV(secret, accountsvr.DatabaseKeyUsername, usr)
-		setSecretKV(secret, accountsvr.DatabaseKeyPassword, pw)
+		SetSecretKV(secret, accountsvr.DatabaseKeyUsername, usr)
+		SetSecretKV(secret, accountsvr.DatabaseKeyPassword, pw)
 
 		return nil
 	}); err != nil {
@@ -393,9 +395,13 @@ func (r *DatabaseAccountReconciler) stageDatabaseCreate(
 		return ctrl.Result{}, dbErr
 	case ok:
 		r.Recorder.WarningEvent(dbAccount, ReasonDatabaseCreate, "Database already exists")
-		if err := secretRun(ctx, r, r, r.AccountServer, dbAccount, func(secret *corev1.Secret) error {
-			setSecretKV(secret, accountsvr.DatabaseKeyDatabase, dbName)
-			setSecretKV(secret, accountsvr.DatabaseKeyDSN, accountsvr.GenerateDSN(secret))
+		if err := SecretRun(ctx, r, r, r.AccountServer, dbAccount, func(secret *corev1.Secret) error {
+			SetSecretKV(secret, accountsvr.DatabaseKeyDatabase, dbName)
+			SetSecretKV(secret, accountsvr.DatabaseKeyDSN, accountsvr.GenerateDSN(secret))
+			if dbAccount.GetSpecCreateRelay() {
+				AddPGBouncerConf(secret)
+				SetSecretKV(secret, accountsvr.DatabaseKeyHost, dbAccount.GetSecretName().Name)
+			}
 
 			boolTrue := true
 			secret.Immutable = &boolTrue
@@ -412,9 +418,13 @@ func (r *DatabaseAccountReconciler) stageDatabaseCreate(
 			return ctrl.Result{}, dbErr
 		}
 
-		if secretErr := secretRun(ctx, r, r, r.AccountServer, dbAccount, func(secret *corev1.Secret) error {
-			setSecretKV(secret, accountsvr.DatabaseKeyDatabase, dbName)
-			setSecretKV(secret, accountsvr.DatabaseKeyDSN, accountsvr.GenerateDSN(secret))
+		if secretErr := SecretRun(ctx, r, r, r.AccountServer, dbAccount, func(secret *corev1.Secret) error {
+			SetSecretKV(secret, accountsvr.DatabaseKeyDatabase, dbName)
+			SetSecretKV(secret, accountsvr.DatabaseKeyDSN, accountsvr.GenerateDSN(secret))
+			if dbAccount.GetSpecCreateRelay() {
+				AddPGBouncerConf(secret)
+				SetSecretKV(secret, accountsvr.DatabaseKeyHost, dbAccount.GetSecretName().Name)
+			}
 
 			boolTrue := true
 			secret.Immutable = &boolTrue
@@ -427,6 +437,70 @@ func (r *DatabaseAccountReconciler) stageDatabaseCreate(
 
 		r.Recorder.NormalEvent(dbAccount, ReasonDatabaseCreate, "Database created")
 	}
+
+	if !dbAccount.GetSpecCreateRelay() {
+		dbAccount.Status.Stage = dbov1.ReadyStage
+		dbAccount.Status.Ready = true
+	} else {
+		dbAccount.Status.Stage = dbov1.RelayCreateStage
+	}
+
+	if err := r.Status().Update(ctx, dbAccount); err != nil {
+		logger.V(1).Error(err, "Unable to update DatabaseAccount")
+
+		return ctrl.Result{}, err
+	}
+
+	if !dbAccount.GetSpecCreateRelay() {
+		r.Recorder.NormalEvent(dbAccount, ReasonReady, "Ready to use")
+	} else {
+		r.Recorder.NormalEvent(dbAccount, ReasonRelayCreate, "Creating Relay Pod")
+	}
+	// logger.Info("Record is marked as ready",
+	// 	"databaseUsername", dbAccount.Status.Name,
+	// 	"secretName", dbAccount.GetSecretName(),
+	// )
+
+	// logger.V(1).Info("return result[ok]")
+	return ctrl.Result{}, nil
+}
+
+func (r *DatabaseAccountReconciler) stageRelayCreate(
+	ctx context.Context,
+	dbAccount *dbov1.DatabaseAccount,
+) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
+	// name, nameErr := dbAccount.GetDatabaseName()
+	// if nameErr != nil {
+	// 	return ctrl.Result{}, nameErr
+	// }
+
+	statefulSet, statefulSetErr := StatefulSetGet(ctx, r, r.Config, dbAccount)
+	if errors.Is(statefulSetErr, ErrNewStatefulSet) {
+		if err := r.Create(ctx, statefulSet); err != nil {
+			logger.V(1).Error(err, "unable to create StatefulSet")
+
+			return ctrl.Result{}, err
+		}
+	} else if statefulSetErr != nil {
+		return ctrl.Result{}, statefulSetErr
+	}
+
+	r.Recorder.NormalEvent(dbAccount, ReasonRelayCreate, "Created StatefulSet")
+
+	service, serviceErr := ServiceGet(ctx, r, dbAccount)
+	if errors.Is(serviceErr, ErrNewService) {
+		if err := r.Create(ctx, service); err != nil {
+			logger.V(1).Error(err, "unable to create Service")
+
+			return ctrl.Result{}, err
+		}
+	} else if serviceErr != nil {
+		return ctrl.Result{}, serviceErr
+	}
+
+	r.Recorder.NormalEvent(dbAccount, ReasonRelayCreate, "Created Service")
 
 	dbAccount.Status.Stage = dbov1.ReadyStage
 	dbAccount.Status.Ready = true
@@ -442,7 +516,7 @@ func (r *DatabaseAccountReconciler) stageDatabaseCreate(
 	// 	"secretName", dbAccount.GetSecretName(),
 	// )
 
-	// logger.V(1).Info("return result[ok]")
+	// // logger.V(1).Info("return result[ok]")
 	return ctrl.Result{}, nil
 }
 
@@ -454,7 +528,7 @@ func (r *DatabaseAccountReconciler) stageReady(
 
 	logger.V(1).Info("Record is marked as ready, nothing to do")
 
-	if _, secretErr := secretGetByName(ctx, r, dbAccount.GetSecretName()); apierrors.IsNotFound(secretErr) {
+	if _, secretErr := SecretGetByName(ctx, r, dbAccount.GetSecretName()); apierrors.IsNotFound(secretErr) {
 		// secret has been deleted, probably sent here from reconcile trigger in secret delete.
 		logger.Info("Secret has been deleted, remove DatabaseAccount")
 
@@ -468,14 +542,14 @@ func (r *DatabaseAccountReconciler) stageReady(
 	}
 
 	onDeleteUpdate := false
-	if err := secretRun(ctx, r, r, r.AccountServer, dbAccount, func(secret *corev1.Secret) error {
+	if err := SecretRun(ctx, r, r, r.AccountServer, dbAccount, func(secret *corev1.Secret) error {
 		// logger.V(1).Info("Checking database account spec")
 		// logger.V(1).Info("Database account spec", "dbAccount.Spec.OnDelete", dbAccount.GetSpecOnDelete())
 		switch dbAccount.GetSpecOnDelete() {
 		case dbov1.OnDeleteDelete:
 			if len(secret.ObjectMeta.OwnerReferences) != 1 {
 				// logger.V(1).Info("Database account marked for deletion but secret does not have ownerreferences")
-				secretAddOwnerRefs(secret, dbAccount)
+				SecretAddOwnerRefs(secret, dbAccount)
 				onDeleteUpdate = true
 			}
 		case dbov1.OnDeleteRetain:
@@ -541,7 +615,7 @@ func (r *DatabaseAccountReconciler) reconcileSecret(ctx context.Context, secretO
 		Name:      secretObj.GetName(),
 		Namespace: secretObj.GetNamespace(),
 	}
-	secret, secretErr := secretGetByName(ctx, r, name)
+	secret, secretErr := SecretGetByName(ctx, r, name)
 	if secretErr != nil {
 		return requests
 	}
@@ -614,22 +688,6 @@ func (r *DatabaseAccountReconciler) setStageOnDatabaseAccount(
 	return dbAccount.SetStage(ctx, r, stage)
 }
 
-// func (r *DatabaseAccountReconciler) addSecretFinalizer(
-// 	ctx context.Context,
-// 	logger logr.Logger,
-// 	secret *corev1.Secret,
-// ) error {
-// 	if !controllerutil.ContainsFinalizer(secret, finalizerName) {
-// 		logger.V(1).Info("adding finalizer to Secret")
-// 		controllerutil.AddFinalizer(secret, finalizerName)
-// 		if err := r.Update(ctx, secret); err != nil {
-// 			return err
-// 		}
-// 	}
-
-// 	return nil
-// }
-
 func (r *DatabaseAccountReconciler) reconcileSecretExternalDependency(
 	ctx context.Context,
 	logger logr.Logger,
@@ -665,19 +723,6 @@ func (r *DatabaseAccountReconciler) reconcileSecretExternalDependency(
 
 	return requests
 }
-
-// // SetupWithManager sets up the controller with the Manager.
-// func (r *DatabaseAccountReconciler) SetupWithManager(mgr ctrl.Manager) error {
-// 	return ctrl.NewControllerManagedBy(mgr).
-// 		For(&v1.DatabaseAccount{}).
-// 		Owns(&corev1.Secret{}).
-// 		Watches(
-// 			&source.Kind{Type: &corev1.Secret{}},
-// 			handler.EnqueueRequestsFromMapFunc(r.reconcileSecret),
-// 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-// 		).
-// 		Complete(r)
-// }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *DatabaseAccountReconciler) SetupWithManager(mgr ctrl.Manager) error {

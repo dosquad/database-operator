@@ -7,3 +7,4 @@ metadata:
   name: secretaccount
 spec:
   secretName: custom-secret-name
+  createRelay: true

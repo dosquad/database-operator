@@ -86,5 +86,6 @@ const (
 	ReasonQueued         RecorderReason = "Queued"
 	ReasonUserCreate     RecorderReason = "UserCreate"
 	ReasonDatabaseCreate RecorderReason = "DatabaseCreate"
+	ReasonRelayCreate    RecorderReason = "RelayCreate"
 	ReasonReady          RecorderReason = "Ready"
 )

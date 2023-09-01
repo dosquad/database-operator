@@ -155,6 +155,10 @@ spec:
                   disable the metrics serving.
                 type: string
             type: object
+          relayImage:
+            default: edoburu/pgbouncer:1.20.1-p0
+            description: RelayImage is the image used for the relay pod.
+            type: string
           syncPeriod:
             description: SyncPeriod determines the minimum frequency at which watched
               resources are reconciled. A lower period will correct entropy more quickly,

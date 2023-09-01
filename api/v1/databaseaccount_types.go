@@ -37,6 +37,11 @@ type DatabaseAccountSpec struct {
 	// +kubebuilder:default:=delete
 	OnDelete DatabaseAccountOnDelete `json:"onDelete,omitempty"`
 
+	// CreateRelay will create a relay pod and use that for the DSN if requested.
+	//+optional
+	// +kubebuilder:default:=false
+	CreateRelay bool `json:"createRelay,omitempty"`
+
 	// Name is the basename used for the resource, if not specified a UUID will be used.
 	//+optional
 	Name PostgreSQLResourceName `json:"name,omitempty"`
@@ -99,6 +104,7 @@ type DatabaseAccountStatus struct {
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.ready`,description="ready status of database account"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="Name",priority=1,type=string,JSONPath=`.status.name`,description="name of the database account"
+// +kubebuilder:resource:shortName="dba"
 
 // DatabaseAccount is the Schema for the databaseaccounts API.
 type DatabaseAccount struct {
@@ -132,6 +138,10 @@ func (d *DatabaseAccount) GetSecretName() types.NamespacedName {
 	}
 }
 
+func (d *DatabaseAccount) GetStatefulSetName() types.NamespacedName {
+	return d.GetSecretName()
+}
+
 func (d *DatabaseAccount) GetDatabaseName() (string, error) {
 	if len(d.Status.Name) == 0 {
 		return "", ErrMissingDatabaseUsername
@@ -151,6 +161,10 @@ func (d *DatabaseAccount) GetSpecOnDelete() DatabaseAccountOnDelete {
 	return OnDeleteDelete
 }
 
+func (d *DatabaseAccount) GetSpecCreateRelay() bool {
+	return d.Spec.CreateRelay
+}
+
 func (d *DatabaseAccount) UpdateStatus(ctx context.Context, r client.StatusClient) error {
 	return r.Status().Update(ctx, d)
 }
@@ -164,7 +178,7 @@ func (d *DatabaseAccount) SetStage(ctx context.Context, r client.StatusClient, s
 		d.Status.Stage = stage
 
 		switch d.Status.Stage {
-		case UnknownStage, InitStage, UserCreateStage, DatabaseCreateStage, ErrorStage, ReadyStage:
+		case UnknownStage, InitStage, UserCreateStage, DatabaseCreateStage, RelayCreateStage, ErrorStage, ReadyStage:
 			// do nothing
 		case TerminatingStage:
 			d.Status.Ready = false
