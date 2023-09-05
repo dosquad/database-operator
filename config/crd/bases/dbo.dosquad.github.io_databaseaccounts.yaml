@@ -12,6 +12,8 @@ spec:
     kind: DatabaseAccount
     listKind: DatabaseAccountList
     plural: databaseaccounts
+    shortNames:
+    - dba
     singular: databaseaccount
   scope: Namespaced
   versions:
@@ -52,6 +54,11 @@ spec:
           spec:
             description: DatabaseAccountSpec defines the desired state of DatabaseAccount.
             properties:
+              createRelay:
+                default: false
+                description: CreateRelay will create a relay pod and use that for
+                  the DSN if requested.
+                type: boolean
               name:
                 description: Name is the basename used for the resource, if not specified
                   a UUID will be used.
@@ -122,6 +129,7 @@ spec:
                 - Init
                 - UserCreate
                 - DatabaseCreate
+                - RelayCreate
                 - Error
                 - Ready
                 - Terminating

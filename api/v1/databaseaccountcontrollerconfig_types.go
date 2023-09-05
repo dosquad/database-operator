@@ -21,6 +21,8 @@ import (
 	cfg "sigs.k8s.io/controller-runtime/pkg/config/v1alpha1"
 )
 
+const ()
+
 // DatabaseAccountControllerConfig is the Schema for the databaseaccountcontrollerconfigs API.
 //
 // +kubebuilder:object:root=true
@@ -34,7 +36,12 @@ type DatabaseAccountControllerConfig struct {
 	Debug DatabaseAccountControllerConfigDebug `json:"debug,omitempty"`
 
 	// DatabaseDSN is the DSN for the database that will be used for creating accounts and databases on.
-	DatabaseDSN string `json:"dsn,omitempty"`
+	DatabaseDSN PostgreSQLDSN `json:"dsn,omitempty"`
+
+	// RelayImage is the image used for the relay pod.
+	//+optional
+	// +kubebuilder:default:="edoburu/pgbouncer:1.20.1-p0"
+	RelayImage string `json:"relayImage,omitempty"`
 }
 
 // DatabaseAccountControllerConfigList contains a list of DatabaseAccountControllerConfig.
@@ -52,4 +59,16 @@ type DatabaseAccountControllerConfigDebug struct {
 
 func init() {
 	SchemeBuilder.Register(&DatabaseAccountControllerConfig{}, &DatabaseAccountControllerConfigList{})
+}
+
+func (d *DatabaseAccountControllerConfig) GetRelayImage() string {
+	if d.RelayImage == "" {
+		return DefaultRelayImage
+	}
+
+	return d.RelayImage
+}
+
+func (d *DatabaseAccountControllerConfig) GetDSNHost() string {
+	return d.DatabaseDSN.Host()
 }
