@@ -261,11 +261,26 @@ func (s *Server) CreateSchema(ctx context.Context, schemaName, roleName string) 
 	return nil
 }
 
-func (s *Server) CopyInitConfigToSecret(secret *corev1.Secret) {
+func (s *Server) GetDatabaseHostConfig() string {
+	return s.conn.Config().Host
+}
+
+func (s *Server) GetDatabaseHost(dbAccount *dbov1.DatabaseAccount) string {
+	if dbAccount.GetSpecCreateRelay() {
+		return dbAccount.GetStatefulSetName().Name
+	}
+
+	return s.GetDatabaseHostConfig()
+}
+
+func (s *Server) CopyInitConfigToSecret(
+	dbAccount *dbov1.DatabaseAccount,
+	secret *corev1.Secret,
+) {
 	if secret.Data == nil {
 		secret.Data = make(map[string][]byte)
 	}
-	secret.Data[DatabaseKeyHost] = []byte(s.conn.Config().Host)
+	secret.Data[DatabaseKeyHost] = []byte(s.GetDatabaseHost(dbAccount))
 	secret.Data[DatabaseKeyPort] = []byte(fmt.Sprintf("%d", s.conn.Config().Port))
 }
 

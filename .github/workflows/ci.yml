@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  unittest:
+  unit-test:
     name: "Unit Test"
     runs-on: ubuntu-latest
     steps:

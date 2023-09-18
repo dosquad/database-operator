@@ -57,6 +57,8 @@ type DatabaseAccountReconciler struct {
 //+kubebuilder:rbac:groups=dbo.dosquad.github.io,resources=events,verbs=create;patch
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="apps",resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -278,7 +280,7 @@ func (r *DatabaseAccountReconciler) stageInit(
 			return err
 		}
 
-		r.AccountServer.CopyInitConfigToSecret(secret)
+		r.AccountServer.CopyInitConfigToSecret(dbAccount, secret)
 		SetSecretKV(secret, accountsvr.DatabaseKeyUsername, name)
 		if dbAccount.GetSpecOnDelete() != dbov1.OnDeleteRetain {
 			SecretAddOwnerRefs(secret, dbAccount)
@@ -399,7 +401,7 @@ func (r *DatabaseAccountReconciler) stageDatabaseCreate(
 			SetSecretKV(secret, accountsvr.DatabaseKeyDatabase, dbName)
 			SetSecretKV(secret, accountsvr.DatabaseKeyDSN, accountsvr.GenerateDSN(secret))
 			if dbAccount.GetSpecCreateRelay() {
-				AddPGBouncerConf(secret)
+				AddPGBouncerConf(r.AccountServer, secret)
 				SetSecretKV(secret, accountsvr.DatabaseKeyHost, dbAccount.GetSecretName().Name)
 			}
 
@@ -422,7 +424,7 @@ func (r *DatabaseAccountReconciler) stageDatabaseCreate(
 			SetSecretKV(secret, accountsvr.DatabaseKeyDatabase, dbName)
 			SetSecretKV(secret, accountsvr.DatabaseKeyDSN, accountsvr.GenerateDSN(secret))
 			if dbAccount.GetSpecCreateRelay() {
-				AddPGBouncerConf(secret)
+				AddPGBouncerConf(r.AccountServer, secret)
 				SetSecretKV(secret, accountsvr.DatabaseKeyHost, dbAccount.GetSecretName().Name)
 			}
 

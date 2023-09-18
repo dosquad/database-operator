@@ -80,7 +80,10 @@ stats_users = {{.User}}
 `
 )
 
-func AddPGBouncerConf(secret *corev1.Secret) {
+func AddPGBouncerConf(
+	accountSvr *accountsvr.Server,
+	secret *corev1.Secret,
+) {
 	tmpl, tmplErr := template.New("").Parse(pgBouncerConfTemplate)
 	if tmplErr != nil {
 		return
@@ -89,7 +92,7 @@ func AddPGBouncerConf(secret *corev1.Secret) {
 	data := struct {
 		Host, Port, User, Password string
 	}{
-		Host:     GetSecretKV(secret, accountsvr.DatabaseKeyHost),
+		Host:     accountSvr.GetDatabaseHostConfig(),
 		Port:     fmt.Sprintf("%d", defaultPostgresqlPort),
 		User:     GetSecretKV(secret, accountsvr.DatabaseKeyUsername),
 		Password: GetSecretKV(secret, accountsvr.DatabaseKeyPassword),
@@ -125,7 +128,7 @@ func SecretRun(
 
 	secret, secretErr := SecretGet(ctx, r, dbAccount)
 	if errors.Is(secretErr, ErrNewSecret) {
-		accountSvr.CopyInitConfigToSecret(secret)
+		accountSvr.CopyInitConfigToSecret(dbAccount, secret)
 		if err := w.Create(ctx, secret); err != nil {
 			logger.V(1).Error(err, "unable to create secret")
 
