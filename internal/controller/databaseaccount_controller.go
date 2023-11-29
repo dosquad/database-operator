@@ -47,7 +47,7 @@ type DatabaseAccountReconciler struct {
 	client.Client
 	Scheme        *runtime.Scheme
 	Recorder      Recorder
-	AccountServer *accountsvr.Server
+	AccountServer accountsvr.Server
 	Config        *dbov1.DatabaseAccountControllerConfig
 }
 
@@ -144,13 +144,13 @@ func (r *DatabaseAccountReconciler) handleFinalizers(
 
 	if dbAccount.ObjectMeta.DeletionTimestamp.IsZero() {
 		// object is not being deleted currently, check for and add finalizers
-		if !controllerutil.AddFinalizer(dbAccount, finalizerName) {
-			logger.V(1).Info("added finalizer to DatabaseAccount")
-			controllerutil.AddFinalizer(dbAccount, finalizerName)
+		// TODO WHAT IS HAPPENING HERE ?
+		if controllerutil.AddFinalizer(dbAccount, finalizerName) {
 			if err := r.Update(ctx, dbAccount); err != nil {
 				return true, err
 			}
 
+			logger.V(1).Info("added finalizer to DatabaseAccount")
 			return true, nil
 		}
 

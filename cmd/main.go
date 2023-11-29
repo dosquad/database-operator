@@ -119,7 +119,7 @@ func mainCommand() error {
 		return mgrErr
 	}
 
-	svr, svrErr := accountsvr.NewServer(context.Background(), ctrlConfig.DatabaseDSN)
+	svr, svrErr := accountsvr.NewDatabaseServer(context.Background(), ctrlConfig.DatabaseDSN)
 	if svrErr != nil {
 		setupLog.Error(svrErr, "unable to start database connection")
 		return svrErr
