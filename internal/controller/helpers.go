@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/crc32"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -81,7 +82,7 @@ stats_users = {{.User}}
 )
 
 func AddPGBouncerConf(
-	accountSvr *accountsvr.Server,
+	accountSvr accountsvr.Server,
 	secret *corev1.Secret,
 ) {
 	tmpl, tmplErr := template.New("").Parse(pgBouncerConfTemplate)
@@ -93,7 +94,7 @@ func AddPGBouncerConf(
 		Host, Port, User, Password string
 	}{
 		Host:     accountSvr.GetDatabaseHostConfig(),
-		Port:     fmt.Sprintf("%d", defaultPostgresqlPort),
+		Port:     strconv.Itoa(defaultPostgresqlPort),
 		User:     GetSecretKV(secret, accountsvr.DatabaseKeyUsername),
 		Password: GetSecretKV(secret, accountsvr.DatabaseKeyPassword),
 	}
@@ -120,7 +121,7 @@ func SecretRun(
 	ctx context.Context,
 	r client.Reader,
 	w client.Writer,
-	accountSvr *accountsvr.Server,
+	accountSvr accountsvr.Server,
 	dbAccount *dbov1.DatabaseAccount,
 	f SecretFunc,
 ) error {

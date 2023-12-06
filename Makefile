@@ -12,6 +12,10 @@ ENVTEST_K8S_VERSION = 1.26.1
 # GOBIN=$(shell go env GOBIN)
 # endif
 
+GENERATED_FILES += api/v1/zz_generated.deepcopy.go
+
+GO_BUILD_REQ += generate
+
 -include .makefiles/Makefile
 -include .makefiles/pkg/go/v1/Makefile
 -include .makefiles/ext/na4ma4/lib/golangci-lint/v1/Makefile
