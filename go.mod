@@ -3,7 +3,7 @@ module github.com/dosquad/database-operator
 go 1.21
 
 require (
-	github.com/go-logr/logr v1.3.0
+	github.com/go-logr/logr v1.4.1
 	github.com/google/go-cmp v0.6.0
 	github.com/jackc/pgx/v5 v5.5.1
 	github.com/oklog/ulid/v2 v2.1.0
