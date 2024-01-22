@@ -7,8 +7,8 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/jackc/pgx/v5 v5.5.2
 	github.com/oklog/ulid/v2 v2.1.0
-	github.com/onsi/ginkgo/v2 v2.14.0
-	github.com/onsi/gomega v1.30.0
+	github.com/onsi/ginkgo/v2 v2.15.0
+	github.com/onsi/gomega v1.31.1
 	github.com/sethvargo/go-password v0.2.0
 	k8s.io/api v0.29.0
 	k8s.io/apimachinery v0.29.0
