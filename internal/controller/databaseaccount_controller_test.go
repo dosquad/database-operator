@@ -218,7 +218,7 @@ func TestReconcile_Stage_DatabaseCreate(t *testing.T) {
 		controllertest.ReconcileWantSecretNamePassword,
 	}
 
-	ts.svr.OnIsDatabase = func(ctx context.Context, dbName string) (string, bool, error) {
+	ts.svr.OnIsDatabase = func(_ context.Context, dbName string) (string, bool, error) {
 		return dbName, false, nil
 	}
 

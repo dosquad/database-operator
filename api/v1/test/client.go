@@ -2,7 +2,6 @@ package test
 
 import (
 	"context"
-	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,16 +36,16 @@ func NewMockClient() *MockClient {
 func (m *MockClient) CallCountMap() map[string]int {
 	out := map[string]int{}
 	for k, v := range m.MockClientReader.calledFunc {
-		out[fmt.Sprintf("MockClientReader.%s", k)] = v
+		out["MockClientReader."+k] = v
 	}
 	for k, v := range m.MockClientWriter.calledFunc {
-		out[fmt.Sprintf("MockClientWriter.%s", k)] = v
+		out["MockClientWriter."+k] = v
 	}
 	for k, v := range m.MockStatusClient.CallCountMap() {
-		out[fmt.Sprintf("MockStatusClient.%s", k)] = v
+		out["MockStatusClient."+k] = v
 	}
 	for k, v := range m.MockSubResourceClientConstructor.calledFunc {
-		out[fmt.Sprintf("MockSubResourceClientConstructor.%s", k)] = v
+		out["MockSubResourceClientConstructor."+k] = v
 	}
 	for k, v := range m.calledFunc {
 		out[k] = v

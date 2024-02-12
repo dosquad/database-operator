@@ -187,7 +187,7 @@ func TestAccountSvr_ListUsers_QueryError(t *testing.T) {
 	t.Cleanup(cancel)
 
 	errQuery := errors.New("failed to query")
-	mDB.OnQuery = func(ctx context.Context, s string, a ...any) (pgx.Rows, error) {
+	mDB.OnQuery = func(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {
 		return accountsvrtest.NewMockRows(mDB, nil, []string{"foo", "bar"}), errQuery
 	}
 
@@ -213,7 +213,7 @@ func TestAccountSvr_ListUsers_RowError(t *testing.T) {
 	t.Cleanup(cancel)
 
 	errQuery := errors.New("failed to query")
-	mDB.OnQuery = func(ctx context.Context, s string, a ...any) (pgx.Rows, error) {
+	mDB.OnQuery = func(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {
 		mr := accountsvrtest.NewMockRows(mDB, nil, []string{"foo", "bar"})
 		mr.OnErr = func() error {
 			return errQuery
@@ -244,7 +244,7 @@ func TestAccountSvr_ListUsers_RowValueError(t *testing.T) {
 	t.Cleanup(cancel)
 
 	errQuery := errors.New("failed to query")
-	mDB.OnQuery = func(ctx context.Context, s string, a ...any) (pgx.Rows, error) {
+	mDB.OnQuery = func(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {
 		mr := accountsvrtest.NewMockRows(mDB, nil, []string{"foo", "bar"})
 		mr.OnValues = func() ([]any, error) {
 			return nil, errQuery
@@ -290,7 +290,7 @@ func TestAccountSvr_IsRole(t *testing.T) {
 			start, mDB, svr, ctx, cancel := testNewMockDB(t)
 			t.Cleanup(cancel)
 
-			mDB.OnQuery = func(ctx context.Context, s string, a ...any) (pgx.Rows, error) {
+			mDB.OnQuery = func(_ context.Context, _ string, a ...any) (pgx.Rows, error) {
 				if len(a) > 0 {
 					if v, ok := a[0].(string); ok {
 						testhelp.Logf(t, start, "username queried: %s", v)
@@ -352,7 +352,7 @@ func TestAccountSvr_IsDatabase(t *testing.T) {
 			start, mDB, svr, ctx, cancel := testNewMockDB(t)
 			t.Cleanup(cancel)
 
-			mDB.OnQuery = func(ctx context.Context, s string, a ...any) (pgx.Rows, error) {
+			mDB.OnQuery = func(_ context.Context, _ string, a ...any) (pgx.Rows, error) {
 				if len(a) > 0 {
 					if v, ok := a[0].(string); ok {
 						testhelp.Logf(t, start, "database queried: %s", v)
@@ -429,7 +429,7 @@ func TestAccountSvr_CreateRole(t *testing.T) {
 
 			generatedPassword := ""
 
-			mDB.OnQuery = func(ctx context.Context, s string, a ...any) (pgx.Rows, error) {
+			mDB.OnQuery = func(_ context.Context, _ string, a ...any) (pgx.Rows, error) {
 				if len(a) > 0 {
 					if v, ok := a[0].(string); ok {
 						testhelp.Logf(t, start, "database queried: %s", v)
@@ -445,7 +445,7 @@ func TestAccountSvr_CreateRole(t *testing.T) {
 				// no role found
 				return accountsvrtest.NewMockRows(mDB, nil, []string{}), nil
 			}
-			mDB.OnExec = func(ctx context.Context, s string, a ...any) (pgconn.CommandTag, error) {
+			mDB.OnExec = func(_ context.Context, _ string, a ...any) (pgconn.CommandTag, error) {
 				// testhelp.Logf(t, start, "mDB.Exec(): stmt, got '%s'", s)
 				if len(a) > 1 {
 					if v, ok := a[1].(string); ok {
@@ -540,7 +540,7 @@ func TestAccountSvr_UpdateRolePassword(t *testing.T) {
 
 			generatedPassword := ""
 
-			mDB.OnExec = func(ctx context.Context, s string, a ...any) (pgconn.CommandTag, error) {
+			mDB.OnExec = func(_ context.Context, _ string, a ...any) (pgconn.CommandTag, error) {
 				// testhelp.Logf(t, start, "mDB.Exec(): stmt, got '%s'", s)
 				if len(a) > 1 {
 					if v, ok := a[1].(string); ok {
@@ -632,7 +632,7 @@ func TestAccountSvr_CreateDatabase(t *testing.T) {
 			start, mDB, svr, ctx, cancel := testNewMockDB(t)
 			t.Cleanup(cancel)
 
-			mDB.OnExec = func(ctx context.Context, s string, a ...any) (pgconn.CommandTag, error) {
+			mDB.OnExec = func(_ context.Context, _ string, a ...any) (pgconn.CommandTag, error) {
 				// testhelp.Logf(t, start, "mDB.Exec(): stmt, got '%s'", s)
 				if len(a) > 1 {
 					if v, ok := a[1].(string); ok {
@@ -715,7 +715,7 @@ func TestAccountSvr_CreateSchema(t *testing.T) {
 			execSchemaName := ""
 			execRoleName := ""
 
-			mDB.OnExec = func(ctx context.Context, s string, a ...any) (pgconn.CommandTag, error) {
+			mDB.OnExec = func(_ context.Context, _ string, a ...any) (pgconn.CommandTag, error) {
 				// testhelp.Logf(t, start, "mDB.Exec(): stmt, got '%s'", s)
 				if len(a) > 1 {
 					if v, ok := a[1].(string); ok {
@@ -1025,7 +1025,7 @@ func TestAccountSvr_Delete(t *testing.T) {
 			execDatabaseName := ""
 			execRoleName := ""
 
-			mDB.OnExec = func(ctx context.Context, s string, a ...any) (pgconn.CommandTag, error) {
+			mDB.OnExec = func(_ context.Context, s string, a ...any) (pgconn.CommandTag, error) {
 				if len(a) > 0 { //nolint:nestif // testing function.
 					if v, ok := a[0].(string); ok {
 						testhelp.Logf(t, start, "exec[%s]: %s", s, v)

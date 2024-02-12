@@ -1,8 +1,6 @@
 package test
 
 import (
-	"fmt"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -15,7 +13,7 @@ type MockStatusClient struct {
 func (m *MockStatusClient) CallCountMap() map[string]int {
 	out := map[string]int{}
 	for k, v := range m.TestStatusWriter.calledFunc {
-		out[fmt.Sprintf("TestStatusWriter.%s", k)] = v
+		out["TestStatusWriter."+k] = v
 	}
 	for k, v := range m.calledFunc {
 		out[k] = v

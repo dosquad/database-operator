@@ -62,7 +62,7 @@ func (c *ControllerMockWrapper) IncCallCount(name string) {
 
 func (c *ControllerMockWrapper) initMockClientReaderOnGet() {
 	c.Client.MockClientReader.OnGet = func(
-		ctx context.Context, key client.ObjectKey,
+		_ context.Context, key client.ObjectKey,
 		obj client.Object, opts ...client.GetOption,
 	) error {
 		testhelp.Logf(c.t, c.start, "MockClientReader.Get(ctx, '%+v', '%+v', '%+v')", key, obj, opts)
@@ -94,7 +94,7 @@ func (c *ControllerMockWrapper) initMockClientReaderOnGet() {
 }
 
 func (c *ControllerMockWrapper) initMockClientWriterOnCreate() {
-	c.Client.MockClientWriter.OnCreate = func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+	c.Client.MockClientWriter.OnCreate = func(_ context.Context, obj client.Object, opts ...client.CreateOption) error {
 		testhelp.Logf(c.t, c.start, "MockClientWriter.Create(ctx, '%+v', '%+v')", obj, opts)
 		c.IncCallCount(
 			fmt.Sprintf("MockClientWriter.Create(%s)", reflect.TypeOf(obj).String()),
@@ -122,7 +122,7 @@ func (c *ControllerMockWrapper) initMockClientWriterOnCreate() {
 }
 
 func (c *ControllerMockWrapper) initMockClientWriterOnUpdate() {
-	c.Client.MockClientWriter.OnUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+	c.Client.MockClientWriter.OnUpdate = func(_ context.Context, obj client.Object, _ ...client.UpdateOption) error {
 		testhelp.Logf(c.t, c.start, "MockClientWriter.Update(ctx, obj): %+v", obj)
 		c.IncCallCount(
 			fmt.Sprintf("MockClientWriter.Update(%s)", reflect.TypeOf(obj).String()),
@@ -146,8 +146,8 @@ func (c *ControllerMockWrapper) initMockClientWriterOnUpdate() {
 
 func (c *ControllerMockWrapper) initTestStatusWriterOnUpdate() {
 	c.Client.TestStatusWriter.OnUpdate = func(
-		ctx context.Context, o client.Object,
-		sruo ...client.SubResourceUpdateOption,
+		_ context.Context, o client.Object,
+		_ ...client.SubResourceUpdateOption,
 	) error {
 		testhelp.Logf(c.t, c.start, "TestStatusWriter.OnUpdate(ctx, obj): %+v", o)
 		switch v := o.(type) {

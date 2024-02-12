@@ -182,8 +182,8 @@ func TestUpdateStatus(t *testing.T) {
 	var changeObject v1.DatabaseAccount
 
 	c.TestStatusWriter.OnUpdate = func(
-		ctx context.Context, o client.Object,
-		sruo ...client.SubResourceUpdateOption,
+		_ context.Context, o client.Object,
+		_ ...client.SubResourceUpdateOption,
 	) error {
 		switch v := o.(type) {
 		case *v1.DatabaseAccount:
@@ -224,7 +224,7 @@ func TestUpdate(t *testing.T) {
 
 	var changeObject v1.DatabaseAccount
 
-	c.OnUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+	c.OnUpdate = func(_ context.Context, obj client.Object, _ ...client.UpdateOption) error {
 		switch v := obj.(type) {
 		case *v1.DatabaseAccount:
 			if v != nil {
@@ -295,8 +295,8 @@ func TestSetStage(t *testing.T) {
 			var changeObject v1.DatabaseAccount
 
 			c.TestStatusWriter.OnUpdate = func(
-				ctx context.Context, o client.Object,
-				sruo ...client.SubResourceUpdateOption,
+				_ context.Context, o client.Object,
+				_ ...client.SubResourceUpdateOption,
 			) error {
 				switch v := o.(type) {
 				case *v1.DatabaseAccount:
