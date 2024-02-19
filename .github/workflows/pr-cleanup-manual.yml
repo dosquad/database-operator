@@ -1,0 +1,29 @@
+name: Manual Cleanup on Closed Pull Request
+
+on:
+  workflow_dispatch:
+    inputs:
+      owner:
+        required: true
+        default: ${{github.repository_owner}}
+        description: "Repository Owner"
+        type: string
+      pull-request-merged:
+        required: true
+        description: "Pull Request Merged Boolean (github.event.pull_request.merged)"
+        type: boolean
+      pull-request-number:
+        required: true
+        description: "Pull Request Number (github.event.pull_request.number)"
+        type: string
+
+jobs:
+  docker:
+    name: "Docker Cleanup"
+    uses: dosquad/actions/.github/workflows/docker-pr-cleanup.yml@main
+    with:
+      package-name: database-operator
+      owner: ${{github.event.inputs.owner}}
+      pull-request-merged: ${{github.event.inputs.pull-request-merged}}
+      pull-request-number: ${{github.event.inputs.pull-request-number}}
+    secrets: inherit
