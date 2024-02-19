@@ -42,6 +42,14 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Set up Go
+      if: ${{ hashFiles('go.mod') != '' }}
+      uses: actions/setup-go@v5
+      with:
+        go-version: ^1
+        cache: false
+      id: go
+
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
