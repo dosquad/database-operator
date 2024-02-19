@@ -16,11 +16,11 @@ GENERATED_FILES += api/v1/zz_generated.deepcopy.go
 
 GO_BUILD_REQ += generate
 
+-include Makefile.kubebuilder
+
 -include .makefiles/Makefile
 -include .makefiles/pkg/go/v1/Makefile
 -include .makefiles/ext/na4ma4/lib/golangci-lint/v1/Makefile
-
--include Makefile.kubebuilder
 
 .makefiles/ext/na4ma4/%: .makefiles/Makefile
 	@curl -sfL https://raw.githubusercontent.com/na4ma4/makefiles-ext/main/v1/install | bash /dev/stdin "$@"

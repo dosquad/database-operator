@@ -7,7 +7,7 @@ LOCALBIN ?= artifacts/bin
 #########################################################################################################
 ## Controller Gen
 
-CONTROLLER_TOOLS_VERSION ?= v0.11.3
+CONTROLLER_TOOLS_VERSION ?= v0.14.0
 CONTROLLER_GEN ?= artifacts/bin/$(CONTROLLER_TOOLS_VERSION)/controller-gen
 
 artifacts/bin/%/controller-gen:
@@ -29,7 +29,7 @@ generate:: $(CONTROLLER_GEN) ## Generate code containing DeepCopy, DeepCopyInto,
 #########################################################################################################
 ## Kustomize
 
-KUSTOMIZE_VERSION ?= v5.0.3
+KUSTOMIZE_VERSION ?= v5.3.0
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 
 KUSTOMIZE ?= artifacts/bin/$(KUSTOMIZE_VERSION)/kustomize
@@ -60,3 +60,6 @@ tools:: $(ENVTEST)
 # envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 # $(ENVTEST): $(LOCALBIN)
 # 	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+
+_clean::
+	sudo $(RM) -r artifacts/bin/k8s
