@@ -8,9 +8,9 @@ LOCALBIN ?= artifacts/bin
 ## Controller Gen
 
 CONTROLLER_TOOLS_VERSION ?= v0.14.0
-CONTROLLER_GEN ?= artifacts/bin/$(CONTROLLER_TOOLS_VERSION)/controller-gen
+CONTROLLER_GEN ?= $(LOCALBIN)/$(CONTROLLER_TOOLS_VERSION)/controller-gen
 
-artifacts/bin/%/controller-gen:
+$(LOCALBIN)/%/controller-gen:
 	-@mkdir -p "$(MF_PROJECT_ROOT)/$(@D)"
 	test -s $(CONTROLLER_GEN) && $(CONTROLLER_GEN) --version | grep -q $(*) || \
 	GOBIN="$(MF_PROJECT_ROOT)/$(@D)" go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(*)
@@ -25,6 +25,9 @@ manifests:: $(CONTROLLER_GEN) ## Generate WebhookConfiguration, ClusterRole and 
 generate:: $(CONTROLLER_GEN) ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
+$(GENERATED_FILES):: $(CONTROLLER_GEN)
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+
 
 #########################################################################################################
 ## Kustomize
@@ -32,9 +35,9 @@ generate:: $(CONTROLLER_GEN) ## Generate code containing DeepCopy, DeepCopyInto,
 KUSTOMIZE_VERSION ?= v5.3.0
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 
-KUSTOMIZE ?= artifacts/bin/$(KUSTOMIZE_VERSION)/kustomize
+KUSTOMIZE ?= $(LOCALBIN)/$(KUSTOMIZE_VERSION)/kustomize
 
-artifacts/bin/%/kustomize:
+$(LOCALBIN)/%/kustomize:
 	-@mkdir -p "$(MF_PROJECT_ROOT)/$(@D)"
 	@if test -x $(KUSTOMIZE) && ! $(KUSTOMIZE) version | grep -q $(*); then \
 		echo "$(KUSTOMIZE) version is not expected $(*). Removing it before installing."; \
@@ -47,9 +50,9 @@ tools:: $(KUSTOMIZE)
 #########################################################################################################
 ## env-test
 
-ENVTEST ?= artifacts/bin/$(ENVTEST_K8S_VERSION)/setup-envtest
+ENVTEST ?= $(LOCALBIN)/$(ENVTEST_K8S_VERSION)/setup-envtest
 
-artifacts/bin/%/setup-envtest:
+$(LOCALBIN)/%/setup-envtest:
 	-@mkdir -p "$(MF_PROJECT_ROOT)/$(@D)"
 	test -s $(ENVTEST) || \
 	GOBIN="$(MF_PROJECT_ROOT)/$(@D)" go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
@@ -62,4 +65,4 @@ tools:: $(ENVTEST)
 # 	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 
 _clean::
-	sudo $(RM) -r artifacts/bin/k8s
+	sudo $(RM) -r $(LOCALBIN)/k8s

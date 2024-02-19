@@ -14,13 +14,14 @@ ENVTEST_K8S_VERSION = 1.26.1
 
 GENERATED_FILES += api/v1/zz_generated.deepcopy.go
 
-GO_BUILD_REQ += generate
-
--include Makefile.kubebuilder
+GO_TEST_REQ += $(GENERATED_FILES)
+GO_BUILD_REQ += $(GENERATED_FILES)
 
 -include .makefiles/Makefile
 -include .makefiles/pkg/go/v1/Makefile
 -include .makefiles/ext/na4ma4/lib/golangci-lint/v1/Makefile
+
+-include Makefile.kubebuilder
 
 .makefiles/ext/na4ma4/%: .makefiles/Makefile
 	@curl -sfL https://raw.githubusercontent.com/na4ma4/makefiles-ext/main/v1/install | bash /dev/stdin "$@"
