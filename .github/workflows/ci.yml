@@ -8,36 +8,5 @@ on:
 jobs:
   unit-test:
     name: "Unit Test"
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: ^1
-      id: go
-
-    - name: Set up go env
-      run: export PATH=${PATH}:`go env GOPATH`/bin
-
-    - name: Run golangci/golangci-lint
-      uses: golangci/golangci-lint-action@v4
-      with:
-        skip-cache: true
-        version: latest
-
-    - name: Run Unit Tests
-      run: |
-        make test
-        git status
-
-    - name: Publish Unit Test Coverage
-      uses: codecov/codecov-action@v4
-      with:
-        flags: unittests
-        files: cover.out
-
-    - name: Check diff
-      run: '[[ -z $(git status -s) ]] || (printf "Existing modified/untracked files.\nPlease run \"make generate manifests\" and push again.\n"; exit 1)'
+    uses: dosquad/actions/.github/workflows/unit-test.yml@main
+    secrets: inherit
