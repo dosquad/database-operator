@@ -5,8 +5,7 @@ on:
     inputs:
       owner:
         required: true
-        default: ${{github.repository_owner}}
-        description: "Repository Owner"
+        description: "Repository Owner (github.repository_owner)"
         type: string
       pull-request-merged:
         required: true
@@ -23,7 +22,7 @@ jobs:
     uses: dosquad/actions/.github/workflows/docker-pr-cleanup.yml@main
     with:
       package-name: database-operator
-      owner: ${{github.event.inputs.owner}}
-      pull-request-merged: ${{github.event.inputs.pull-request-merged}}
-      pull-request-number: ${{github.event.inputs.pull-request-number}}
+      owner: "${{github.event.inputs.owner}}"
+      pull-request-merged: ${{fromJSON(github.event.inputs.pull-request-merged)}}
+      pull-request-number: "${{github.event.inputs.pull-request-number}}"
     secrets: inherit
