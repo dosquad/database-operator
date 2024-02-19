@@ -13,4 +13,5 @@ jobs:
     with:
       image: ghcr.io/dosquad/database-operator
       platforms: 'linux/amd64,linux/arm64'
+      latest-on-branch: '{{is_default_branch}}'
     secrets: inherit
