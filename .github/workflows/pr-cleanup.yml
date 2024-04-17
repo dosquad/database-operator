@@ -12,6 +12,6 @@ jobs:
     with:
       package-name: database-operator
       owner: "${{github.repository_owner}}"
-      pull-request-merged: "${{github.event.inputs.pull-request-merged}}"
+      pull-request-merged: "${{github.event.pull_request.merged}}"
       pull-request-number: "${{github.event.pull_request.number}}"
     secrets: inherit
