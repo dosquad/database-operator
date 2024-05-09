@@ -18,6 +18,7 @@ package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	configv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	cfg "sigs.k8s.io/controller-runtime/pkg/config/v1alpha1"
 )
 
@@ -42,6 +43,10 @@ type DatabaseAccountControllerConfig struct {
 	//+optional
 	// +kubebuilder:default:="edoburu/pgbouncer:1.20.1-p0"
 	RelayImage string `json:"relayImage,omitempty"`
+
+	// LeaderElection config
+	//+optional
+	LeaderElection *configv1alpha1.LeaderElectionConfiguration `json:"leaderElection,omitempty"`
 }
 
 // DatabaseAccountControllerConfigList contains a list of DatabaseAccountControllerConfig.

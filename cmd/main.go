@@ -28,11 +28,11 @@ import (
 	"github.com/dosquad/database-operator/accountsvr"
 	dbov1 "github.com/dosquad/database-operator/api/v1"
 	"github.com/dosquad/database-operator/internal/controller"
+	"github.com/dosquad/database-operator/internal/helper"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
-	cfg "sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -106,7 +106,7 @@ func mainCommand() error {
 		LeaderElectionReleaseOnCancel: true,
 	}
 	if configFile != "" {
-		options, err = options.AndFrom(cfg.File().AtPath(configFile).OfKind(&ctrlConfig))
+		options, err = helper.LoadConfigFile(configFile, options)
 		if err != nil {
 			setupLog.Error(err, "unable to load the config file")
 			return err

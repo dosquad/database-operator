@@ -365,8 +365,6 @@ issues:
         - noctx
         - wrapcheck
     - linters: [ staticcheck ]
-      text: "options.AndFrom is deprecated"
-    - linters: [ staticcheck ]
       text: "The component config package has been deprecated and will be removed in a future release."
     - path: "cmd/"
       linters:

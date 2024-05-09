@@ -110,9 +110,7 @@ spec:
               More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           leaderElection:
-            description: |-
-              LeaderElection is the LeaderElection config to be used when configuring
-              the manager.Manager leader election
+            description: LeaderElection config
             properties:
               leaderElect:
                 description: |-
