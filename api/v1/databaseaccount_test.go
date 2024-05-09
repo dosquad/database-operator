@@ -282,7 +282,6 @@ func TestSetStage(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		if tt.name == "" {
 			tt.name = tt.state.String()
 		}

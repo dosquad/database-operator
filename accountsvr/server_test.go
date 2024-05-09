@@ -76,7 +76,6 @@ func TestAccountSvr_CheckInvalidName(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -284,7 +283,6 @@ func TestAccountSvr_IsRole(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			start, mDB, svr, ctx, cancel := testNewMockDB(t)
@@ -346,7 +344,6 @@ func TestAccountSvr_IsDatabase(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			start, mDB, svr, ctx, cancel := testNewMockDB(t)
@@ -421,7 +418,6 @@ func TestAccountSvr_CreateRole(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			start, mDB, svr, ctx, cancel := testNewMockDB(t)
@@ -532,7 +528,6 @@ func TestAccountSvr_UpdateRolePassword(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			start, mDB, svr, ctx, cancel := testNewMockDB(t)
@@ -626,7 +621,6 @@ func TestAccountSvr_CreateDatabase(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			start, mDB, svr, ctx, cancel := testNewMockDB(t)
@@ -705,7 +699,6 @@ func TestAccountSvr_CreateSchema(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -846,7 +839,6 @@ func TestAccountSvr_GetDatabaseHost(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -976,7 +968,6 @@ func TestAccountSvr_GenerateDSN(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			dsn := accountsvr.GenerateDSN(tt.secret)
@@ -1015,7 +1006,6 @@ func TestAccountSvr_Delete(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 

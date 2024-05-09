@@ -42,6 +42,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+const (
+	RatioForJitter = 2
+)
+
 // DatabaseAccountReconciler reconciles a DatabaseAccount object.
 type DatabaseAccountReconciler struct {
 	client.Client
@@ -105,7 +109,7 @@ func (r *DatabaseAccountReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	if r.Config.Debug.ReconcileSleep > 0 {
 		//nolint:gosec,gomnd // simple random for use when debugging.
-		n := rand.Intn(r.Config.Debug.ReconcileSleep/2) + r.Config.Debug.ReconcileSleep/2
+		n := rand.Intn(r.Config.Debug.ReconcileSleep/RatioForJitter) + r.Config.Debug.ReconcileSleep/RatioForJitter
 		logger.V(1).Info(fmt.Sprintf("sleeping %d seconds", n))
 		time.Sleep(time.Duration(n) * time.Second)
 	}
