@@ -12,8 +12,8 @@ require (
 	github.com/onsi/ginkgo/v2 v2.17.3
 	github.com/onsi/gomega v1.33.1
 	github.com/sethvargo/go-password v0.3.0
-	k8s.io/api v0.30.0
-	k8s.io/apimachinery v0.30.0
+	k8s.io/api v0.30.1
+	k8s.io/apimachinery v0.30.1
 	k8s.io/client-go v0.29.2
 	k8s.io/component-base v0.29.2
 	k8s.io/klog/v2 v2.120.1
