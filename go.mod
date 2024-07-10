@@ -1,8 +1,6 @@
 module github.com/dosquad/database-operator
 
-go 1.22.0
-
-toolchain go1.22.2
+go 1.22.2
 
 require (
 	github.com/go-logr/logr v1.4.2
