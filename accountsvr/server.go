@@ -12,6 +12,7 @@ import (
 	dbov1 "github.com/dosquad/database-operator/api/v1"
 	"github.com/jackc/pgx/v5"
 	"github.com/sethvargo/go-password/password"
+	"go.uber.org/multierr"
 	corev1 "k8s.io/api/core/v1"
 	logr "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -125,9 +126,13 @@ func (s *DatabaseServer) Close(ctx context.Context) error {
 func (s *DatabaseServer) ListUsers(ctx context.Context) []string {
 	_ = s.Connect(ctx)
 
-	rows, rowErr := s.conn.Query(ctx, `select usename from pg_catalog.pg_user`)
-	if rowErr != nil {
-		return []string{}
+	var rows pgx.Rows
+	{
+		var err error
+		rows, err = s.conn.Query(ctx, `select usename from pg_catalog.pg_user`)
+		if err != nil {
+			return []string{}
+		}
 	}
 	defer rows.Close()
 
@@ -168,9 +173,13 @@ func (s *DatabaseServer) generatePassword(ctx context.Context) string {
 func (s *DatabaseServer) IsRole(ctx context.Context, roleName string) (bool, error) {
 	_ = s.Connect(ctx)
 
-	rows, err := s.conn.Query(ctx, `select usename from pg_catalog.pg_user where usename=$1`, roleName)
-	if err != nil {
-		return false, err
+	var rows pgx.Rows
+	{
+		var err error
+		rows, err = s.conn.Query(ctx, `select usename from pg_catalog.pg_user where usename=$1`, roleName)
+		if err != nil {
+			return false, err
+		}
 	}
 	defer rows.Close()
 
@@ -180,14 +189,21 @@ func (s *DatabaseServer) IsRole(ctx context.Context, roleName string) (bool, err
 func (s *DatabaseServer) IsDatabase(ctx context.Context, dbName string) (string, bool, error) {
 	_ = s.Connect(ctx)
 
-	dbName, err := s.CheckInvalidName(dbName)
-	if err != nil {
-		return dbName, false, err
+	{
+		var err error
+		dbName, err = s.CheckInvalidName(dbName)
+		if err != nil {
+			return dbName, false, err
+		}
 	}
 
-	rows, err := s.conn.Query(ctx, `SELECT FROM pg_database WHERE datname = $1`, dbName)
-	if err != nil {
-		return dbName, false, err
+	var rows pgx.Rows
+	{
+		var err error
+		rows, err = s.conn.Query(ctx, `SELECT FROM pg_database WHERE datname = $1`, dbName)
+		if err != nil {
+			return dbName, false, err
+		}
 	}
 	defer rows.Close()
 
@@ -202,13 +218,15 @@ func (s *DatabaseServer) CreateRole(ctx context.Context, roleName string) (strin
 		if v {
 			return "", "", ErrRoleExists
 		}
-
 		return "", "", err
 	}
 
-	roleName, rollNameErr := s.CheckInvalidName(roleName)
-	if rollNameErr != nil {
-		return "", "", fmt.Errorf("role name[%s]: %w", roleName, rollNameErr)
+	{
+		var err error
+		roleName, err = s.CheckInvalidName(roleName)
+		if err != nil {
+			return "", "", fmt.Errorf("role name[%s]: %w", roleName, err)
+		}
 	}
 
 	password := s.generatePassword(ctx)
@@ -227,9 +245,12 @@ func (s *DatabaseServer) UpdateRolePassword(ctx context.Context, roleName string
 	_ = s.Connect(ctx)
 	logger := logr.FromContext(ctx)
 
-	roleName, roleNameErr := s.CheckInvalidName(roleName)
-	if roleNameErr != nil {
-		return "", "", fmt.Errorf("role name[%s]: %w", roleName, roleNameErr)
+	{
+		var err error
+		roleName, err = s.CheckInvalidName(roleName)
+		if err != nil {
+			return "", "", fmt.Errorf("role name[%s]: %w", roleName, err)
+		}
 	}
 
 	password := s.generatePassword(ctx)
@@ -246,23 +267,28 @@ func (s *DatabaseServer) UpdateRolePassword(ctx context.Context, roleName string
 func (s *DatabaseServer) CreateDatabase(ctx context.Context, dbName, roleName string) (string, error) {
 	_ = s.Connect(ctx)
 	logger := logr.FromContext(ctx)
-	var err error
 
-	dbName, err = s.CheckInvalidName(dbName)
-	if err != nil {
-		return "", fmt.Errorf("database name[%s]: %w", dbName, err)
+	{
+		var err error
+		dbName, err = s.CheckInvalidName(dbName)
+		if err != nil {
+			return "", fmt.Errorf("database name[%s]: %w", dbName, err)
+		}
 	}
 
-	roleName, err = s.CheckInvalidName(roleName)
-	if err != nil {
-		return "", fmt.Errorf("role name[%s]: %w", roleName, err)
+	{
+		var err error
+		roleName, err = s.CheckInvalidName(roleName)
+		if err != nil {
+			return "", fmt.Errorf("role name[%s]: %w", roleName, err)
+		}
 	}
 
 	// stmt := fmt.Sprintf(`CREATE DATABASE %s OWNER %s`, dbName, roleName)
 	stmt := `CREATE DATABASE $1 OWNER $2`
 	logger.V(1).Info(fmt.Sprintf("SQL: %s (%s, %s)", stmt, dbName, roleName))
-	if _, execErr := s.conn.Exec(ctx, `CREATE DATABASE $1 OWNER $2`, dbName, roleName); execErr != nil {
-		return "", execErr
+	if _, err := s.conn.Exec(ctx, `CREATE DATABASE $1 OWNER $2`, dbName, roleName); err != nil {
+		return "", err
 	}
 
 	return dbName, nil
@@ -271,23 +297,28 @@ func (s *DatabaseServer) CreateDatabase(ctx context.Context, dbName, roleName st
 func (s *DatabaseServer) CreateSchema(ctx context.Context, schemaName, roleName string) error {
 	_ = s.Connect(ctx)
 	logger := logr.FromContext(ctx)
-	var err error
 
-	schemaName, err = s.CheckInvalidName(schemaName)
-	if err != nil {
-		return fmt.Errorf("schema name[%s]: %w", schemaName, err)
+	{
+		var err error
+		schemaName, err = s.CheckInvalidName(schemaName)
+		if err != nil {
+			return fmt.Errorf("schema name[%s]: %w", schemaName, err)
+		}
 	}
 
-	roleName, err = s.CheckInvalidName(roleName)
-	if err != nil {
-		return fmt.Errorf("role name[%s]: %w", roleName, err)
+	{
+		var err error
+		roleName, err = s.CheckInvalidName(roleName)
+		if err != nil {
+			return fmt.Errorf("role name[%s]: %w", roleName, err)
+		}
 	}
 
 	// stmt := fmt.Sprintf(`CREATE SCHEMA IF NOT EXISTS %s AUTHORIZATION %s`, schemaName, roleName)
 	stmt := `CREATE SCHEMA IF NOT EXISTS $1 AUTHORIZATION $2`
 	logger.V(1).Info(fmt.Sprintf("SQL: %s (%s, %s)", stmt, schemaName, roleName))
-	if _, execErr := s.conn.Exec(ctx, stmt, schemaName, roleName); execErr != nil {
-		return execErr
+	if _, err := s.conn.Exec(ctx, stmt, schemaName, roleName); err != nil {
+		return err
 	}
 
 	return nil
@@ -361,25 +392,36 @@ func (s *DatabaseServer) Delete(ctx context.Context, name string) error {
 	_ = s.Connect(ctx)
 	// logger := logr.FromContext(ctx)
 
-	name, err := s.CheckInvalidName(name)
-	if err != nil {
-		return fmt.Errorf("name[%s]: %w", name, err)
+	{
+		var err error
+		name, err = s.CheckInvalidName(name)
+		if err != nil {
+			return fmt.Errorf("name[%s]: %w", name, err)
+		}
 	}
+
+	var retErr error
 
 	// stmt := fmt.Sprintf(`DROP DATABASE IF EXISTS %s WITH (FORCE)`, name)
 	// logger.V(1).Info(fmt.Sprintf("SQL: %s", stmt))
-	if _, execErr := s.conn.Exec(ctx, `DROP DATABASE IF EXISTS $1 WITH (FORCE)`, name); execErr != nil {
-		if !strings.Contains(execErr.Error(), " not found") {
-			return execErr
+	if _, err := s.conn.Exec(ctx, `DROP DATABASE IF EXISTS $1 WITH (FORCE)`, name); err != nil {
+		if !strings.Contains(err.Error(), " not found") {
+			return err
 		}
+		retErr = multierr.Append(retErr, fmt.Errorf("database drop failed: %w", err))
 	}
 
 	// stmt = fmt.Sprintf(`DROP ROLE IF EXISTS %s`, name)
 	// logger.V(1).Info(fmt.Sprintf("SQL: %s", stmt))
-	if _, execErr := s.conn.Exec(ctx, `DROP ROLE IF EXISTS $1`, name); execErr != nil {
-		if !strings.Contains(execErr.Error(), " not found") {
-			return execErr
+	if _, err := s.conn.Exec(ctx, `DROP ROLE IF EXISTS $1`, name); err != nil {
+		if !strings.Contains(err.Error(), " not found") {
+			return err
 		}
+		retErr = multierr.Append(retErr, fmt.Errorf("roll drop failed: %w", err))
+	}
+
+	if retErr != nil {
+		return retErr
 	}
 
 	return nil

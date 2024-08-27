@@ -85,9 +85,13 @@ func AddPGBouncerConf(
 	accountSvr accountsvr.Server,
 	secret *corev1.Secret,
 ) {
-	tmpl, tmplErr := template.New("").Parse(pgBouncerConfTemplate)
-	if tmplErr != nil {
-		return
+	var tmpl *template.Template
+	{
+		var err error
+		tmpl, err = template.New("").Parse(pgBouncerConfTemplate)
+		if err != nil {
+			return
+		}
 	}
 
 	data := struct {

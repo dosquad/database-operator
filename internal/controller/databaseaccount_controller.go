@@ -337,26 +337,32 @@ func (r *DatabaseAccountReconciler) stageUserCreate(
 	r.Recorder.NormalEvent(dbAccount, ReasonUserCreate, "Creating database user")
 
 	if err := SecretRun(ctx, r, r, r.AccountServer, dbAccount, func(secret *corev1.Secret) error {
-		name, err := dbAccount.GetDatabaseName()
-		if err != nil {
-			return err
+		var name string
+		{
+			var err error
+			name, err = dbAccount.GetDatabaseName()
+			if err != nil {
+				return err
+			}
 		}
 
-		usr, pw, err := r.AccountServer.CreateRole(ctx, name)
-		if errors.Is(err, accountsvr.ErrRoleExists) {
-			r.Recorder.WarningEvent(dbAccount, ReasonUserCreate, "User exists, creating new password")
-			usr, pw, err = r.AccountServer.UpdateRolePassword(ctx, name)
+		{
+			usr, pw, err := r.AccountServer.CreateRole(ctx, name)
+			if errors.Is(err, accountsvr.ErrRoleExists) {
+				r.Recorder.WarningEvent(dbAccount, ReasonUserCreate, "User exists, creating new password")
+				usr, pw, err = r.AccountServer.UpdateRolePassword(ctx, name)
+			}
+			if err != nil {
+				r.Recorder.WarningEvent(dbAccount, ReasonUserCreate, fmt.Sprintf("Failed to create user: %s", err))
+
+				return err
+			}
+
+			r.Recorder.NormalEvent(dbAccount, ReasonUserCreate, "User created")
+
+			SetSecretKV(secret, accountsvr.DatabaseKeyUsername, usr)
+			SetSecretKV(secret, accountsvr.DatabaseKeyPassword, pw)
 		}
-		if err != nil {
-			r.Recorder.WarningEvent(dbAccount, ReasonUserCreate, fmt.Sprintf("Failed to create user: %s", err))
-
-			return err
-		}
-
-		r.Recorder.NormalEvent(dbAccount, ReasonUserCreate, "User created")
-
-		SetSecretKV(secret, accountsvr.DatabaseKeyUsername, usr)
-		SetSecretKV(secret, accountsvr.DatabaseKeyPassword, pw)
 
 		return nil
 	}); err != nil {
@@ -384,9 +390,13 @@ func (r *DatabaseAccountReconciler) stageDatabaseCreate(
 ) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	name, nameErr := dbAccount.GetDatabaseName()
-	if nameErr != nil {
-		return ctrl.Result{}, nameErr
+	var name string
+	{
+		var err error
+		name, err = dbAccount.GetDatabaseName()
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	dbName, ok, dbErr := r.AccountServer.IsDatabase(ctx, name)
@@ -418,13 +428,16 @@ func (r *DatabaseAccountReconciler) stageDatabaseCreate(
 			return ctrl.Result{}, err
 		}
 	default:
-		dbName, dbErr = r.AccountServer.CreateDatabase(ctx, name, name)
-		if dbErr != nil {
-			r.Recorder.WarningEvent(dbAccount, ReasonDatabaseCreate, fmt.Sprintf("Failed to create database: %s", dbErr))
-			return ctrl.Result{}, dbErr
+		{
+			var err error
+			dbName, err = r.AccountServer.CreateDatabase(ctx, name, name)
+			if err != nil {
+				r.Recorder.WarningEvent(dbAccount, ReasonDatabaseCreate, fmt.Sprintf("Failed to create database: %s", err))
+				return ctrl.Result{}, err
+			}
 		}
 
-		if secretErr := SecretRun(ctx, r, r, r.AccountServer, dbAccount, func(secret *corev1.Secret) error {
+		if err := SecretRun(ctx, r, r, r.AccountServer, dbAccount, func(secret *corev1.Secret) error {
 			SetSecretKV(secret, accountsvr.DatabaseKeyDatabase, dbName)
 			SetSecretKV(secret, accountsvr.DatabaseKeyDSN, accountsvr.GenerateDSN(secret))
 			if dbAccount.GetSpecCreateRelay() {
@@ -435,10 +448,10 @@ func (r *DatabaseAccountReconciler) stageDatabaseCreate(
 			boolTrue := true
 			secret.Immutable = &boolTrue
 			return nil
-		}); secretErr != nil {
-			logger.V(1).Error(secretErr, "Unable to update secret")
+		}); err != nil {
+			logger.V(1).Error(err, "Unable to update secret")
 
-			return ctrl.Result{}, secretErr
+			return ctrl.Result{}, err
 		}
 
 		r.Recorder.NormalEvent(dbAccount, ReasonDatabaseCreate, "Database created")
