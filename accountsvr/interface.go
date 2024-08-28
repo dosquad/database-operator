@@ -8,7 +8,6 @@ import (
 )
 
 type Server interface {
-	CheckInvalidName(name string) (string, error)
 	Connect(ctx context.Context) error
 	Close(ctx context.Context) error
 	ListUsers(ctx context.Context) []string

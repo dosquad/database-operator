@@ -13,6 +13,7 @@ import (
 	accountsvrtest "github.com/dosquad/database-operator/accountsvr/test"
 	dbov1 "github.com/dosquad/database-operator/api/v1"
 	"github.com/dosquad/database-operator/internal/testhelp"
+	"github.com/dosquad/database-operator/internal/valid"
 	"github.com/google/go-cmp/cmp"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -46,7 +47,7 @@ func testNewMockDB(t *testing.T) (
 
 func TestAccountSvr_CheckInvalidName(t *testing.T) {
 	t.Parallel()
-	start, _, svr, _, cancel := testNewMockDB(t)
+	start, _, _, _, cancel := testNewMockDB(t)
 	t.Cleanup(cancel)
 
 	tests := []struct {
@@ -58,11 +59,11 @@ func TestAccountSvr_CheckInvalidName(t *testing.T) {
 	}{
 		{"ExpectPass_SimpleName", "testname", "testname", nil, ""},
 		{"ExpectPass_ComplexName", "k8s_01hdfk6ss05fm11pzs7k846eax", "k8s_01hdfk6ss05fm11pzs7k846eax", nil, ""},
-		{"ExpectFail_ReservedName_psql", "psql", "psql", accountsvr.ErrInvalidName, ""},
-		{"ExpectFail_ReservedName_root", "root", "root", accountsvr.ErrInvalidName, ""},
-		{"ExpectFail_ReservedName_postgres", "postgres", "postgres", accountsvr.ErrInvalidName, ""},
-		{"ExpectFail_ReservedName_CaseInsensitive", "POSTGRES", "POSTGRES", accountsvr.ErrInvalidName, ""},
-		{"ExpectFail_StartWithDigit", "9name", "9name", accountsvr.ErrInvalidName, "invalid characters"},
+		{"ExpectFail_ReservedName_psql", "psql", "psql", valid.ErrInvalidName, ""},
+		{"ExpectFail_ReservedName_root", "root", "root", valid.ErrInvalidName, ""},
+		{"ExpectFail_ReservedName_postgres", "postgres", "postgres", valid.ErrInvalidName, ""},
+		{"ExpectFail_ReservedName_CaseInsensitive", "POSTGRES", "POSTGRES", valid.ErrInvalidName, ""},
+		{"ExpectFail_StartWithDigit", "9name", "9name", valid.ErrInvalidName, "invalid characters"},
 		{"ExpectSuccess_ContainsDigit", "x9name", "x9name", nil, ""},
 		{"ExpectSuccess_StripInvalidChar_Hash", "foo#bar", "foobar", nil, ""},
 		{"ExpectSuccess_StripInvalidChar_Dash", "foo-bar", "foobar", nil, ""},
@@ -71,7 +72,7 @@ func TestAccountSvr_CheckInvalidName(t *testing.T) {
 		{
 			"ExpectFail_Length_64",
 			strings.Repeat("x", 64), strings.Repeat("x", 64),
-			accountsvr.ErrInvalidName, "name too long",
+			valid.ErrInvalidName, "name too long",
 		},
 	}
 
@@ -79,20 +80,20 @@ func TestAccountSvr_CheckInvalidName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			name, err := svr.CheckInvalidName(tt.databaseName)
+			name, err := valid.PGIdentifier(tt.databaseName).Validate()
 			if !errors.Is(err, tt.expectError) {
-				testhelp.Errorf(t, start, "svr.CheckInvalidName(): error, got '%+v', want '%+v'", err, tt.expectError)
+				testhelp.Errorf(t, start, "valid.PGIdentifier(): error, got '%+v', want '%+v'", err, tt.expectError)
 			}
 
 			if err != nil && tt.expectErrorContains != "" && !strings.Contains(err.Error(), tt.expectErrorContains) {
 				testhelp.Errorf(t, start,
-					"svr.CheckInvalidName(): error expected to contain string, got '%+v', want '%+v'",
+					"valid.PGIdentifier(): error expected to contain string, got '%+v', want '%+v'",
 					err, tt.expectErrorContains,
 				)
 			}
 
 			if name != tt.expectDatabaseName {
-				testhelp.Errorf(t, start, "svr.CheckInvalidName(): name, got '%s', want '%s'", name, tt.expectDatabaseName)
+				testhelp.Errorf(t, start, "valid.PGIdentifier(): name, got '%s', want '%s'", name, tt.expectDatabaseName)
 			}
 		})
 	}
@@ -340,7 +341,7 @@ func TestAccountSvr_IsDatabase(t *testing.T) {
 		{"ExpectFail_DatabaseDoesNotExist", "poly", "poly", false, nil},
 		{"ExpectFail_ServerError", "internal_server_error", "internal_server_error", false, internalServerError},
 		{"ExpectSuccess_CorrectedDatabaseName", "roly-poly", "rolypoly", true, nil},
-		{"ExpectFail_DatabaseNameLength", strings.Repeat("x", 64), strings.Repeat("x", 64), false, accountsvr.ErrInvalidName},
+		{"ExpectFail_DatabaseNameLength", strings.Repeat("x", 64), strings.Repeat("x", 64), false, valid.ErrInvalidName},
 	}
 
 	for _, tt := range tests {
@@ -388,7 +389,7 @@ func TestAccountSvr_IsDatabase(t *testing.T) {
 				"IsClosed": 1,
 				"Query":    1,
 			}
-			if errors.Is(err, accountsvr.ErrInvalidName) {
+			if errors.Is(err, valid.ErrInvalidName) {
 				delete(expectCalledFunc, "Query")
 			}
 
@@ -414,7 +415,7 @@ func TestAccountSvr_CreateRole(t *testing.T) {
 		{"ExpectFail_DatabaseExists", "roly", "", false, accountsvr.ErrRoleExists},
 		{"ExpectFail_ServerError", "internal_server_error", "", false, internalServerError},
 		{"ExpectFail_ServerErrorExec", "exec_internal_server_error", "", true, internalServerError},
-		{"ExpectFail_DatabaseNameLength", strings.Repeat("x", 64), "", false, accountsvr.ErrInvalidName},
+		{"ExpectFail_DatabaseNameLength", strings.Repeat("x", 64), "", false, valid.ErrInvalidName},
 	}
 
 	for _, tt := range tests {
@@ -441,8 +442,9 @@ func TestAccountSvr_CreateRole(t *testing.T) {
 				// no role found
 				return accountsvrtest.NewMockRows(mDB, nil, []string{}), nil
 			}
-			mDB.OnExec = func(_ context.Context, _ string, a ...any) (pgconn.CommandTag, error) {
+			mDB.OnExec = func(_ context.Context, s string, a ...any) (pgconn.CommandTag, error) {
 				// testhelp.Logf(t, start, "mDB.Exec(): stmt, got '%s'", s)
+				a = replaceArgs(t, start, s, a)
 				if len(a) > 1 {
 					if v, ok := a[1].(string); ok {
 						testhelp.Logf(t, start, "password: %s", v)
@@ -524,7 +526,7 @@ func TestAccountSvr_UpdateRolePassword(t *testing.T) {
 		{"ExpectSuccess_CorrectedDatabaseName", "roly-poly", "rolypoly", true, nil},
 		{"ExpectFail_DatabaseDoesNotExists", "poly", "", true, dbNotFound},
 		{"ExpectFail_ServerErrorExec", "exec_internal_server_error", "", true, internalServerError},
-		{"ExpectFail_DatabaseNameLength", strings.Repeat("x", 64), "", false, accountsvr.ErrInvalidName},
+		{"ExpectFail_DatabaseNameLength", strings.Repeat("x", 64), "", false, valid.ErrInvalidName},
 	}
 
 	for _, tt := range tests {
@@ -535,8 +537,9 @@ func TestAccountSvr_UpdateRolePassword(t *testing.T) {
 
 			generatedPassword := ""
 
-			mDB.OnExec = func(_ context.Context, _ string, a ...any) (pgconn.CommandTag, error) {
+			mDB.OnExec = func(_ context.Context, s string, a ...any) (pgconn.CommandTag, error) {
 				// testhelp.Logf(t, start, "mDB.Exec(): stmt, got '%s'", s)
+				a = replaceArgs(t, start, s, a)
 				if len(a) > 1 {
 					if v, ok := a[1].(string); ok {
 						testhelp.Logf(t, start, "password: %s", v)
@@ -616,8 +619,8 @@ func TestAccountSvr_CreateDatabase(t *testing.T) {
 		{"ExpectSuccess", "newroly", "newroly", "newroly", true, nil},
 		{"ExpectSuccess_CorrectedDatabaseName", "new-roly", "rolename", "newroly", true, nil},
 		{"ExpectFail_ServerErrorExec", "exec_internal_server_error", "rolename", "", true, internalServerError},
-		{"ExpectFail_DatabaseNameLength", strings.Repeat("x", 64), "rolename", "", false, accountsvr.ErrInvalidName},
-		{"ExpectFail_RoleNameLength", "dbname", strings.Repeat("x", 64), "", false, accountsvr.ErrInvalidName},
+		{"ExpectFail_DatabaseNameLength", strings.Repeat("x", 64), "rolename", "", false, valid.ErrInvalidName},
+		{"ExpectFail_RoleNameLength", "dbname", strings.Repeat("x", 64), "", false, valid.ErrInvalidName},
 	}
 
 	for _, tt := range tests {
@@ -626,8 +629,8 @@ func TestAccountSvr_CreateDatabase(t *testing.T) {
 			start, mDB, svr, ctx, cancel := testNewMockDB(t)
 			t.Cleanup(cancel)
 
-			mDB.OnExec = func(_ context.Context, _ string, a ...any) (pgconn.CommandTag, error) {
-				// testhelp.Logf(t, start, "mDB.Exec(): stmt, got '%s'", s)
+			mDB.OnExec = func(_ context.Context, s string, a ...any) (pgconn.CommandTag, error) {
+				a = replaceArgs(t, start, s, a)
 				if len(a) > 1 {
 					if v, ok := a[1].(string); ok {
 						testhelp.Logf(t, start, "role name: %s", v)
@@ -694,8 +697,8 @@ func TestAccountSvr_CreateSchema(t *testing.T) {
 		{"ExpectSuccess_CorrectedRoleName", "newroly", "role-name", "newroly", "rolename", true, nil},
 		{"ExpectSuccess_CorrectedSchemaAndRoleName", "new-roly", "role-name", "newroly", "rolename", true, nil},
 		{"ExpectFail_ServerErrorExec", "exec_internal_server_error", "rolename", "", "rolename", true, internalServerError},
-		{"ExpectFail_SchemaNameLength", strings.Repeat("x", 64), "rolename", "", "", false, accountsvr.ErrInvalidName},
-		{"ExpectFail_RoleNameLength", "dbname", strings.Repeat("x", 64), "", "", false, accountsvr.ErrInvalidName},
+		{"ExpectFail_SchemaNameLength", strings.Repeat("x", 64), "rolename", "", "", false, valid.ErrInvalidName},
+		{"ExpectFail_RoleNameLength", "dbname", strings.Repeat("x", 64), "", "", false, valid.ErrInvalidName},
 	}
 
 	for _, tt := range tests {
@@ -708,8 +711,9 @@ func TestAccountSvr_CreateSchema(t *testing.T) {
 			execSchemaName := ""
 			execRoleName := ""
 
-			mDB.OnExec = func(_ context.Context, _ string, a ...any) (pgconn.CommandTag, error) {
+			mDB.OnExec = func(_ context.Context, s string, a ...any) (pgconn.CommandTag, error) {
 				// testhelp.Logf(t, start, "mDB.Exec(): stmt, got '%s'", s)
+				a = replaceArgs(t, start, s, a)
 				if len(a) > 1 {
 					if v, ok := a[1].(string); ok {
 						testhelp.Logf(t, start, "role name: %s", v)
@@ -1002,7 +1006,7 @@ func TestAccountSvr_Delete(t *testing.T) {
 			"exec_role_internal_server_error", "exec_role_internal_server_error", "exec_role_internal_server_error",
 			2, internalServerError,
 		},
-		{"ExpectFail_SchemaNameLength", strings.Repeat("x", 64), "", "", 0, accountsvr.ErrInvalidName},
+		{"ExpectFail_SchemaNameLength", strings.Repeat("x", 64), "", "", 0, valid.ErrInvalidName},
 	}
 
 	for _, tt := range tests {
@@ -1016,6 +1020,7 @@ func TestAccountSvr_Delete(t *testing.T) {
 			execRoleName := ""
 
 			mDB.OnExec = func(_ context.Context, s string, a ...any) (pgconn.CommandTag, error) {
+				a = replaceArgs(t, start, s, a)
 				if len(a) > 0 { //nolint:nestif // testing function.
 					if v, ok := a[0].(string); ok {
 						testhelp.Logf(t, start, "exec[%s]: %s", s, v)
@@ -1079,3 +1084,8 @@ func TestAccountSvr_Delete(t *testing.T) {
 		})
 	}
 }
+
+// func TestAccountSvr_GeneratePassword(t *testing.T) {
+// 	t.Parallel()
+
+// }

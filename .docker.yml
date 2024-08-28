@@ -1,4 +1,4 @@
 image: "ghcr.io/dosquad/database-operator"
-# platforms:
-#   - linux/arm64
-#   # - linux/amd64
+platforms:
+  # - linux/arm64
+  - linux/amd64

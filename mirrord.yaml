@@ -1,0 +1,26 @@
+{
+	"feature": {
+		"fs": {
+      "mode": "localwithoverrides",
+      "read_only": [ "/var/run/secrets/.+" ],
+    },
+		"network": {
+			"incoming": {
+					"mode": "steal",
+					"ignore_ports": [9999, 10000],
+					"port_mapping": [[ 8580, 8080 ],[ 8560, 6060 ]]
+			},
+			"outgoing": true
+		},
+		"env": {
+			"include": "*",
+			"override": {
+				"DEBUG": "true"
+			}
+		}
+	},
+	"agent": {
+		"flush_connections": true
+	},
+	"operator": false
+}

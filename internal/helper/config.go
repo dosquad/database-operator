@@ -41,13 +41,15 @@ func loadFile(configFile string) (*dbov1.DatabaseAccountControllerConfig, error)
 }
 
 //nolint:gocognit // testing each parameter before overwriting options.
-func LoadConfigFile(configFile string, options ctrl.Options) (ctrl.Options, error) {
+func LoadConfigFile(configFile string, options ctrl.Options) (
+	ctrl.Options, *dbov1.DatabaseAccountControllerConfig, error,
+) {
 	var newObj *dbov1.DatabaseAccountControllerConfig
 	{
 		var err error
 		newObj, err = loadFile(configFile)
 		if err != nil {
-			return options, err
+			return options, newObj, err
 		}
 	}
 
@@ -99,7 +101,7 @@ func LoadConfigFile(configFile string, options ctrl.Options) (ctrl.Options, erro
 		}
 	}
 
-	return options, nil
+	return options, newObj, nil
 }
 
 func setLeaderElectionConfig(o ctrl.Options, obj *dbov1.DatabaseAccountControllerConfig) ctrl.Options {

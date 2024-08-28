@@ -89,7 +89,7 @@ func mainCommand() error {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	ctrlConfig := dbov1.DatabaseAccountControllerConfig{}
+	var ctrlConfig *dbov1.DatabaseAccountControllerConfig
 	options := ctrl.Options{
 		Scheme: scheme,
 		Metrics: server.Options{
@@ -107,12 +107,14 @@ func mainCommand() error {
 	}
 	if configFile != "" {
 		var err error
-		options, err = helper.LoadConfigFile(configFile, options)
+		options, ctrlConfig, err = helper.LoadConfigFile(configFile, options)
 		if err != nil {
 			setupLog.Error(err, "unable to load the config file")
 			return err
 		}
 	}
+
+	setupLog.Info("Configuration File", "ctrlConfig", ctrlConfig)
 
 	var mgr manager.Manager
 	{
@@ -140,7 +142,7 @@ func mainCommand() error {
 		Scheme:        mgr.GetScheme(),
 		Recorder:      controller.NewRecorder(mgr.GetEventRecorderFor(controllerName)),
 		AccountServer: svr,
-		Config:        &ctrlConfig,
+		Config:        ctrlConfig,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DatabaseAccount")
 		return err

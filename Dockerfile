@@ -16,6 +16,7 @@ COPY cmd/main.go cmd/main.go
 COPY api/ api/
 COPY internal/controller/ internal/controller/
 COPY internal/helper/ internal/helper/
+COPY internal/valid/ internal/valid/
 COPY accountsvr/ accountsvr/
 
 # Build
