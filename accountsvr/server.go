@@ -212,7 +212,7 @@ func (s *DatabaseServer) CreateRole(ctx context.Context, roleName string) (strin
 	stmt := fmt.Sprintf(
 		`CREATE ROLE %s LOGIN PASSWORD %s`,
 		valid.PGIdentifier(roleName).Sanitize(),
-		valid.PGString(password).Sanitize(),
+		valid.PGValue(password).Sanitize(),
 	)
 	// stmt := `CREATE ROLE $1 LOGIN PASSWORD $2`
 	// logger.V(1).Info(fmt.Sprintf("SQL: %s (%s, %s)", stmt, roleName, password))
@@ -240,7 +240,7 @@ func (s *DatabaseServer) UpdateRolePassword(ctx context.Context, roleName string
 
 	stmt := fmt.Sprintf(`ALTER ROLE %s LOGIN PASSWORD %s`,
 		valid.PGIdentifier(roleName).Sanitize(),
-		valid.PGString(password).Sanitize(),
+		valid.PGValue(password).Sanitize(),
 	)
 	// stmt := `ALTER ROLE $1 LOGIN PASSWORD $2`
 	// logger.V(1).Info(fmt.Sprintf("SQL: %s (%s, %s)", stmt, roleName, password))

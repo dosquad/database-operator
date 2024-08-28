@@ -63,18 +63,18 @@ func (ident PGIdentifier) Validate() (string, error) {
 	return name, nil
 }
 
-// PGString a PostgreSQL value.
-type PGString string
+// PGValue a PostgreSQL value.
+type PGValue string
 
 // Sanitize returns a sanitized string safe for SQL interpolation.
-func (ident PGString) Sanitize() string {
+func (ident PGValue) Sanitize() string {
 	s := strings.ReplaceAll(string(ident), string([]byte{0}), "")
 	s = strings.ReplaceAll(s, `'`, `''`)
 	return "'" + s + "'"
 }
 
 // String returns a string safe for SQL and URI use.
-func (ident PGString) String() string {
+func (ident PGValue) String() string {
 	s := strings.ReplaceAll(string(ident), string([]byte{0}), "")
 	s = strings.ReplaceAll(s, `'`, `''`)
 	s = strings.ReplaceAll(s, `@`, ``)
