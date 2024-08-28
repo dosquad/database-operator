@@ -5,33 +5,20 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 
 	dbov1 "github.com/dosquad/database-operator/api/v1"
+	"github.com/dosquad/database-operator/internal/helper"
+	"github.com/dosquad/database-operator/internal/valid"
 	"github.com/jackc/pgx/v5"
-	"github.com/sethvargo/go-password/password"
+	"go.uber.org/multierr"
 	corev1 "k8s.io/api/core/v1"
 	logr "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var (
-	validNameRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]+$`)
-
-	nameRegex = regexp.MustCompile(`[^a-zA-Z0-9_]+`)
-
-	ErrInvalidName = errors.New("invalid name")
-
 	ErrRoleExists = errors.New("role already exists")
-)
-
-const (
-	PostgreSQLNameDataLen = 64
-
-	passwordLength         = 28
-	passwordComplexDigits  = 10
-	passwordComplexSymbols = 1
 )
 
 type DatabaseServer struct {
@@ -74,24 +61,28 @@ func NewDatabaseServerWithMock(
 	return s, nil
 }
 
-func (s *DatabaseServer) CheckInvalidName(name string) (string, error) {
-	name = nameRegex.ReplaceAllString(name, "")
+// func (s *DatabaseServer) CheckInvalidName(name string) (string, error) {
+// 	name = nameRegex.ReplaceAllString(name, "")
 
-	if !validNameRegex.MatchString(name) {
-		return name, fmt.Errorf("%w: invalid characters", ErrInvalidName)
-	}
+// 	if !validNameRegex.MatchString(name) {
+// 		return name, fmt.Errorf("%w: invalid characters", ErrInvalidName)
+// 	}
 
-	switch strings.ToLower(name) {
-	case "postgres", "psql", "root":
-		return name, ErrInvalidName
-	}
+// 	switch strings.ToLower(name) {
+// 	case "postgres", "psql", "root":
+// 		return name, ErrInvalidName
+// 	}
 
-	if len(name) > PostgreSQLNameDataLen-1 {
-		return name, fmt.Errorf("%w: name too long", ErrInvalidName)
-	}
+// 	if len(name) > PostgreSQLNameDataLen-1 {
+// 		return name, fmt.Errorf("%w: name too long", ErrInvalidName)
+// 	}
 
-	return name, nil
-}
+// 	if !strings.HasPrefix(name, helper.DatabaseResourcePrefix) {
+// 		return name, fmt.Errorf("%w: name does not start with resource prefix", ErrInvalidName)
+// 	}
+
+// 	return name, nil
+// }
 
 func (s *DatabaseServer) Connect(ctx context.Context) error {
 	if s.conn != nil {
@@ -125,9 +116,13 @@ func (s *DatabaseServer) Close(ctx context.Context) error {
 func (s *DatabaseServer) ListUsers(ctx context.Context) []string {
 	_ = s.Connect(ctx)
 
-	rows, rowErr := s.conn.Query(ctx, `select usename from pg_catalog.pg_user`)
-	if rowErr != nil {
-		return []string{}
+	var rows pgx.Rows
+	{
+		var err error
+		rows, err = s.conn.Query(ctx, `select usename from pg_catalog.pg_user`)
+		if err != nil {
+			return []string{}
+		}
 	}
 	defer rows.Close()
 
@@ -153,24 +148,16 @@ func (s *DatabaseServer) ListUsers(ctx context.Context) []string {
 	return o
 }
 
-// TODO actually generate password
-func (s *DatabaseServer) generatePassword(ctx context.Context) string {
-	logger := logr.FromContext(ctx)
-
-	res, err := password.Generate(passwordLength, passwordComplexDigits, passwordComplexSymbols, false, false)
-	if err != nil {
-		logger.Error(err, "unable to generate password")
-		panic(err)
-	}
-	return res
-}
-
 func (s *DatabaseServer) IsRole(ctx context.Context, roleName string) (bool, error) {
 	_ = s.Connect(ctx)
 
-	rows, err := s.conn.Query(ctx, `select usename from pg_catalog.pg_user where usename=$1`, roleName)
-	if err != nil {
-		return false, err
+	var rows pgx.Rows
+	{
+		var err error
+		rows, err = s.conn.Query(ctx, `select usename from pg_catalog.pg_user where usename=$1`, roleName)
+		if err != nil {
+			return false, err
+		}
 	}
 	defer rows.Close()
 
@@ -180,14 +167,21 @@ func (s *DatabaseServer) IsRole(ctx context.Context, roleName string) (bool, err
 func (s *DatabaseServer) IsDatabase(ctx context.Context, dbName string) (string, bool, error) {
 	_ = s.Connect(ctx)
 
-	dbName, err := s.CheckInvalidName(dbName)
-	if err != nil {
-		return dbName, false, err
+	{
+		var err error
+		dbName, err = valid.PGIdentifier(dbName).Validate()
+		if err != nil {
+			return dbName, false, err
+		}
 	}
 
-	rows, err := s.conn.Query(ctx, `SELECT FROM pg_database WHERE datname = $1`, dbName)
-	if err != nil {
-		return dbName, false, err
+	var rows pgx.Rows
+	{
+		var err error
+		rows, err = s.conn.Query(ctx, `SELECT FROM pg_database WHERE datname = $1`, dbName)
+		if err != nil {
+			return dbName, false, err
+		}
 	}
 	defer rows.Close()
 
@@ -196,27 +190,34 @@ func (s *DatabaseServer) IsDatabase(ctx context.Context, dbName string) (string,
 
 func (s *DatabaseServer) CreateRole(ctx context.Context, roleName string) (string, string, error) {
 	_ = s.Connect(ctx)
-	logger := logr.FromContext(ctx)
+	// logger := logr.FromContext(ctx)
 
 	if v, err := s.IsRole(ctx, roleName); err != nil || v {
 		if v {
 			return "", "", ErrRoleExists
 		}
-
 		return "", "", err
 	}
 
-	roleName, rollNameErr := s.CheckInvalidName(roleName)
-	if rollNameErr != nil {
-		return "", "", fmt.Errorf("role name[%s]: %w", roleName, rollNameErr)
+	{
+		var err error
+		roleName, err = valid.PGIdentifier(roleName).Validate()
+		if err != nil {
+			return "", "", fmt.Errorf("role name[%s]: %w", roleName, err)
+		}
 	}
 
-	password := s.generatePassword(ctx)
-	// stmt := fmt.Sprintf(`CREATE ROLE %s LOGIN PASSWORD %s`, roleName, password)
-	stmt := `CREATE ROLE $1 LOGIN PASSWORD $2`
-	logger.V(1).Info(fmt.Sprintf("SQL: %s (%s, %s)", stmt, roleName, password))
+	password := helper.GeneratePassword(ctx)
 
-	if _, err := s.conn.Exec(ctx, stmt, roleName, password); err != nil {
+	stmt := fmt.Sprintf(
+		`CREATE ROLE %s LOGIN PASSWORD %s`,
+		valid.PGIdentifier(roleName).Sanitize(),
+		valid.PGValue(password).Sanitize(),
+	)
+	// stmt := `CREATE ROLE $1 LOGIN PASSWORD $2`
+	// logger.V(1).Info(fmt.Sprintf("SQL: %s (%s, %s)", stmt, roleName, password))
+	// if _, err := s.conn.Exec(ctx, stmt, roleName, password); err != nil {
+	if _, err := s.conn.Exec(ctx, stmt); err != nil {
 		return "", "", err
 	}
 
@@ -225,18 +226,26 @@ func (s *DatabaseServer) CreateRole(ctx context.Context, roleName string) (strin
 
 func (s *DatabaseServer) UpdateRolePassword(ctx context.Context, roleName string) (string, string, error) {
 	_ = s.Connect(ctx)
-	logger := logr.FromContext(ctx)
+	// logger := logr.FromContext(ctx)
 
-	roleName, roleNameErr := s.CheckInvalidName(roleName)
-	if roleNameErr != nil {
-		return "", "", fmt.Errorf("role name[%s]: %w", roleName, roleNameErr)
+	{
+		var err error
+		roleName, err = valid.PGIdentifier(roleName).Validate()
+		if err != nil {
+			return "", "", fmt.Errorf("role name[%s]: %w", roleName, err)
+		}
 	}
 
-	password := s.generatePassword(ctx)
-	// stmt := fmt.Sprintf(`ALTER ROLE %s LOGIN PASSWORD '%s'`, roleName, password)
-	stmt := `ALTER ROLE $1 LOGIN PASSWORD $2`
-	logger.V(1).Info(fmt.Sprintf("SQL: %s (%s, %s)", stmt, roleName, password))
-	if _, err := s.conn.Exec(ctx, `ALTER ROLE $1 LOGIN PASSWORD $2`, roleName, password); err != nil {
+	password := helper.GeneratePassword(ctx)
+
+	stmt := fmt.Sprintf(`ALTER ROLE %s LOGIN PASSWORD %s`,
+		valid.PGIdentifier(roleName).Sanitize(),
+		valid.PGValue(password).Sanitize(),
+	)
+	// stmt := `ALTER ROLE $1 LOGIN PASSWORD $2`
+	// logger.V(1).Info(fmt.Sprintf("SQL: %s (%s, %s)", stmt, roleName, password))
+	// if _, err := s.conn.Exec(ctx, `ALTER ROLE $1 LOGIN PASSWORD $2`, roleName, password); err != nil {
+	if _, err := s.conn.Exec(ctx, stmt); err != nil {
 		return "", "", err
 	}
 
@@ -245,24 +254,33 @@ func (s *DatabaseServer) UpdateRolePassword(ctx context.Context, roleName string
 
 func (s *DatabaseServer) CreateDatabase(ctx context.Context, dbName, roleName string) (string, error) {
 	_ = s.Connect(ctx)
-	logger := logr.FromContext(ctx)
-	var err error
+	// logger := logr.FromContext(ctx)
 
-	dbName, err = s.CheckInvalidName(dbName)
-	if err != nil {
-		return "", fmt.Errorf("database name[%s]: %w", dbName, err)
+	{
+		var err error
+		dbName, err = valid.PGIdentifier(dbName).Validate()
+		if err != nil {
+			return "", fmt.Errorf("database name[%s]: %w", dbName, err)
+		}
 	}
 
-	roleName, err = s.CheckInvalidName(roleName)
-	if err != nil {
-		return "", fmt.Errorf("role name[%s]: %w", roleName, err)
+	{
+		var err error
+		roleName, err = valid.PGIdentifier(roleName).Validate()
+		if err != nil {
+			return "", fmt.Errorf("role name[%s]: %w", roleName, err)
+		}
 	}
 
-	// stmt := fmt.Sprintf(`CREATE DATABASE %s OWNER %s`, dbName, roleName)
-	stmt := `CREATE DATABASE $1 OWNER $2`
-	logger.V(1).Info(fmt.Sprintf("SQL: %s (%s, %s)", stmt, dbName, roleName))
-	if _, execErr := s.conn.Exec(ctx, `CREATE DATABASE $1 OWNER $2`, dbName, roleName); execErr != nil {
-		return "", execErr
+	stmt := fmt.Sprintf(`CREATE DATABASE %s OWNER %s`,
+		valid.PGIdentifier(dbName).Sanitize(),
+		valid.PGIdentifier(roleName).Sanitize(),
+	)
+	// stmt := `CREATE DATABASE $1 OWNER $2`
+	// logger.V(1).Info(fmt.Sprintf("SQL: %s (%s, %s)", stmt, dbName, roleName))
+	// if _, err := s.conn.Exec(ctx, `CREATE DATABASE $1 OWNER $2`, dbName, roleName); err != nil {
+	if _, err := s.conn.Exec(ctx, stmt); err != nil {
+		return "", err
 	}
 
 	return dbName, nil
@@ -270,24 +288,33 @@ func (s *DatabaseServer) CreateDatabase(ctx context.Context, dbName, roleName st
 
 func (s *DatabaseServer) CreateSchema(ctx context.Context, schemaName, roleName string) error {
 	_ = s.Connect(ctx)
-	logger := logr.FromContext(ctx)
-	var err error
+	// logger := logr.FromContext(ctx)
 
-	schemaName, err = s.CheckInvalidName(schemaName)
-	if err != nil {
-		return fmt.Errorf("schema name[%s]: %w", schemaName, err)
+	{
+		var err error
+		schemaName, err = valid.PGIdentifier(schemaName).Validate()
+		if err != nil {
+			return fmt.Errorf("schema name[%s]: %w", schemaName, err)
+		}
 	}
 
-	roleName, err = s.CheckInvalidName(roleName)
-	if err != nil {
-		return fmt.Errorf("role name[%s]: %w", roleName, err)
+	{
+		var err error
+		roleName, err = valid.PGIdentifier(roleName).Validate()
+		if err != nil {
+			return fmt.Errorf("role name[%s]: %w", roleName, err)
+		}
 	}
 
-	// stmt := fmt.Sprintf(`CREATE SCHEMA IF NOT EXISTS %s AUTHORIZATION %s`, schemaName, roleName)
-	stmt := `CREATE SCHEMA IF NOT EXISTS $1 AUTHORIZATION $2`
-	logger.V(1).Info(fmt.Sprintf("SQL: %s (%s, %s)", stmt, schemaName, roleName))
-	if _, execErr := s.conn.Exec(ctx, stmt, schemaName, roleName); execErr != nil {
-		return execErr
+	stmt := fmt.Sprintf(
+		`CREATE SCHEMA IF NOT EXISTS %s AUTHORIZATION %s`,
+		valid.PGIdentifier(schemaName).Sanitize(),
+		valid.PGIdentifier(roleName).Sanitize(),
+	)
+	// stmt := `CREATE SCHEMA IF NOT EXISTS $1 AUTHORIZATION $2`
+	// logger.V(1).Info(fmt.Sprintf("SQL: %s (%s, %s)", stmt, schemaName, roleName))
+	if _, err := s.conn.Exec(ctx, stmt); err != nil {
+		return err
 	}
 
 	return nil
@@ -361,25 +388,44 @@ func (s *DatabaseServer) Delete(ctx context.Context, name string) error {
 	_ = s.Connect(ctx)
 	// logger := logr.FromContext(ctx)
 
-	name, err := s.CheckInvalidName(name)
-	if err != nil {
-		return fmt.Errorf("name[%s]: %w", name, err)
-	}
-
-	// stmt := fmt.Sprintf(`DROP DATABASE IF EXISTS %s WITH (FORCE)`, name)
-	// logger.V(1).Info(fmt.Sprintf("SQL: %s", stmt))
-	if _, execErr := s.conn.Exec(ctx, `DROP DATABASE IF EXISTS $1 WITH (FORCE)`, name); execErr != nil {
-		if !strings.Contains(execErr.Error(), " not found") {
-			return execErr
+	{
+		var err error
+		name, err = valid.PGIdentifier(name).Validate()
+		if err != nil {
+			return fmt.Errorf("name[%s]: %w", name, err)
 		}
 	}
 
-	// stmt = fmt.Sprintf(`DROP ROLE IF EXISTS %s`, name)
-	// logger.V(1).Info(fmt.Sprintf("SQL: %s", stmt))
-	if _, execErr := s.conn.Exec(ctx, `DROP ROLE IF EXISTS $1`, name); execErr != nil {
-		if !strings.Contains(execErr.Error(), " not found") {
-			return execErr
+	var returnErr error
+
+	name = valid.PGIdentifier(name).Sanitize()
+
+	{
+		stmt := fmt.Sprintf(`DROP DATABASE IF EXISTS %s WITH (FORCE)`, name)
+		// logger.V(1).Info(fmt.Sprintf("SQL: %s", stmt))
+		// if _, err := s.conn.Exec(ctx, `DROP DATABASE IF EXISTS $1 WITH (FORCE)`, name); err != nil {
+		if _, err := s.conn.Exec(ctx, stmt); err != nil {
+			if !strings.Contains(err.Error(), " not found") {
+				return err
+			}
+			returnErr = multierr.Append(returnErr, fmt.Errorf("database drop failed: %w", err))
 		}
+	}
+
+	{
+		stmt := `DROP ROLE IF EXISTS ` + name
+		// logger.V(1).Info(fmt.Sprintf("SQL: %s", stmt))
+		// if _, err := s.conn.Exec(ctx, `DROP ROLE IF EXISTS $1`, name); err != nil {
+		if _, err := s.conn.Exec(ctx, stmt); err != nil {
+			if !strings.Contains(err.Error(), " not found") {
+				return err
+			}
+			returnErr = multierr.Append(returnErr, fmt.Errorf("roll drop failed: %w", err))
+		}
+	}
+
+	if returnErr != nil {
+		return returnErr
 	}
 
 	return nil

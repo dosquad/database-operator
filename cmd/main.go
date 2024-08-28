@@ -35,6 +35,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	//+kubebuilder:scaffold:imports
@@ -68,7 +69,6 @@ func mainCommand() error {
 	var enableLeaderElection bool
 	var probeAddr string
 	var configFile string
-	var err error
 
 	setupLog := ctrl.Log.WithName("setup")
 
@@ -89,7 +89,7 @@ func mainCommand() error {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	ctrlConfig := dbov1.DatabaseAccountControllerConfig{}
+	var ctrlConfig *dbov1.DatabaseAccountControllerConfig
 	options := ctrl.Options{
 		Scheme: scheme,
 		Metrics: server.Options{
@@ -106,49 +106,60 @@ func mainCommand() error {
 		LeaderElectionReleaseOnCancel: true,
 	}
 	if configFile != "" {
-		options, err = helper.LoadConfigFile(configFile, options)
+		var err error
+		options, ctrlConfig, err = helper.LoadConfigFile(configFile, options)
 		if err != nil {
 			setupLog.Error(err, "unable to load the config file")
 			return err
 		}
 	}
 
-	mgr, mgrErr := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
-	if mgrErr != nil {
-		setupLog.Error(mgrErr, "unable to start manager")
-		return mgrErr
+	setupLog.Info("Configuration File", "ctrlConfig", ctrlConfig)
+
+	var mgr manager.Manager
+	{
+		var err error
+		mgr, err = ctrl.NewManager(ctrl.GetConfigOrDie(), options)
+		if err != nil {
+			setupLog.Error(err, "unable to start manager")
+			return err
+		}
 	}
 
-	svr, svrErr := accountsvr.NewDatabaseServer(context.Background(), ctrlConfig.DatabaseDSN)
-	if svrErr != nil {
-		setupLog.Error(svrErr, "unable to start database connection")
-		return svrErr
+	var svr *accountsvr.DatabaseServer
+	{
+		var err error
+		svr, err = accountsvr.NewDatabaseServer(context.Background(), ctrlConfig.DatabaseDSN)
+		if err != nil {
+			setupLog.Error(err, "unable to start database connection")
+			return err
+		}
 	}
 	defer svr.Close(context.Background())
 
-	if err = (&controller.DatabaseAccountReconciler{
+	if err := (&controller.DatabaseAccountReconciler{
 		Client:        mgr.GetClient(),
 		Scheme:        mgr.GetScheme(),
 		Recorder:      controller.NewRecorder(mgr.GetEventRecorderFor(controllerName)),
 		AccountServer: svr,
-		Config:        &ctrlConfig,
+		Config:        ctrlConfig,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DatabaseAccount")
 		return err
 	}
 	//+kubebuilder:scaffold:builder
 
-	if err = mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
 		return err
 	}
-	if err = mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up ready check")
 		return err
 	}
 
 	setupLog.Info("starting manager")
-	if err = mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		return err
 	}

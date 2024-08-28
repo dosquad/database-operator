@@ -11,6 +11,7 @@ import (
 
 	"github.com/dosquad/database-operator/accountsvr"
 	dbov1 "github.com/dosquad/database-operator/api/v1"
+	"github.com/dosquad/database-operator/internal/helper"
 	"github.com/oklog/ulid/v2"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -34,7 +35,7 @@ const (
 
 // NewDatabaseAccountName returns a newly generated database/username.
 func NewDatabaseAccountName(_ context.Context) dbov1.PostgreSQLResourceName {
-	return dbov1.PostgreSQLResourceName(strings.ToLower("k8s_" + ulid.Make().String()))
+	return dbov1.PostgreSQLResourceName(strings.ToLower(helper.DatabaseResourcePrefix + ulid.Make().String()))
 }
 
 func SetSecretKV(secret *corev1.Secret, key, value string) {
@@ -85,9 +86,13 @@ func AddPGBouncerConf(
 	accountSvr accountsvr.Server,
 	secret *corev1.Secret,
 ) {
-	tmpl, tmplErr := template.New("").Parse(pgBouncerConfTemplate)
-	if tmplErr != nil {
-		return
+	var tmpl *template.Template
+	{
+		var err error
+		tmpl, err = template.New("").Parse(pgBouncerConfTemplate)
+		if err != nil {
+			return
+		}
 	}
 
 	data := struct {

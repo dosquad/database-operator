@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM golang:1.22 AS builder
+FROM golang:1.23 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -16,6 +16,7 @@ COPY cmd/main.go cmd/main.go
 COPY api/ api/
 COPY internal/controller/ internal/controller/
 COPY internal/helper/ internal/helper/
+COPY internal/valid/ internal/valid/
 COPY accountsvr/ accountsvr/
 
 # Build

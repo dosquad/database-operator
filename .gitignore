@@ -28,3 +28,4 @@ Dockerfile.cross
 # makefiles
 /.makefiles
 /artifacts
+/dist
