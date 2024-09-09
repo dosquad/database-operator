@@ -8,7 +8,7 @@ require (
 	github.com/jackc/pgx/v5 v5.7.0
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/onsi/ginkgo/v2 v2.20.2
-	github.com/onsi/gomega v1.34.1
+	github.com/onsi/gomega v1.34.2
 	github.com/sethvargo/go-password v0.3.1
 	go.uber.org/multierr v1.11.0
 	k8s.io/api v0.30.3
