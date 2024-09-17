@@ -3,7 +3,7 @@ module github.com/dosquad/database-operator/magefiles
 go 1.22.2
 
 require (
-	github.com/dosquad/mage v0.1.28
+	github.com/dosquad/mage v0.1.31
 	github.com/magefile/mage v1.15.0
 )
 
