@@ -28,6 +28,8 @@ type ControllerMockWrapper struct {
 }
 
 func NewControllerMockWrapper(t *testing.T, start time.Time, client *v1test.MockClient) *ControllerMockWrapper {
+	t.Helper()
+
 	c := &ControllerMockWrapper{
 		t:      t,
 		start:  start,

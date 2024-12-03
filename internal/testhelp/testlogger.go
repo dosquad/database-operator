@@ -14,6 +14,8 @@ type TestingLogWrapper struct {
 }
 
 func NewTestingLogWrapper(t *testing.T, start time.Time) *TestingLogWrapper {
+	t.Helper()
+
 	return &TestingLogWrapper{
 		t,
 		start,

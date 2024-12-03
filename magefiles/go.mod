@@ -10,10 +10,10 @@ require (
 require (
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/cheggaaa/pb/v3 v3.1.5 // indirect
-	github.com/dosquad/go-cliversion v0.1.6 // indirect
+	github.com/dosquad/go-cliversion v0.1.9 // indirect
 	github.com/dosquad/go-giturl v0.1.1 // indirect
-	github.com/fatih/color v1.17.0 // indirect
-	github.com/go-resty/resty/v2 v2.14.0 // indirect
+	github.com/fatih/color v1.18.0 // indirect
+	github.com/go-resty/resty/v2 v2.16.2 // indirect
 	github.com/h2non/filetype v1.1.3 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -22,8 +22,8 @@ require (
 	github.com/princjef/mageutil v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/net v0.28.0 // indirect
-	golang.org/x/sys v0.24.0 // indirect
-	golang.org/x/text v0.17.0 // indirect
+	golang.org/x/net v0.31.0 // indirect
+	golang.org/x/sys v0.27.0 // indirect
+	golang.org/x/text v0.20.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

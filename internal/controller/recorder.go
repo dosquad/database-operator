@@ -6,8 +6,8 @@ import (
 )
 
 type Recorder interface {
-	NormalEvent(*v1.DatabaseAccount, RecorderReason, string)
-	WarningEvent(*v1.DatabaseAccount, RecorderReason, string)
+	NormalEvent(dbAccount *v1.DatabaseAccount, reason RecorderReason, message string)
+	WarningEvent(dbAccount *v1.DatabaseAccount, reason RecorderReason, message string)
 	// Event(*v1.DatabaseAccount, RecorderEventType, RecorderReason, string)
 }
 

@@ -139,8 +139,8 @@ func (s *DatabaseServer) ListUsers(ctx context.Context) []string {
 		}
 
 		if len(v) > 0 {
-			if _, ok := v[0].(string); ok {
-				o = append(o, v[0].(string))
+			if user, ok := v[0].(string); ok {
+				o = append(o, user)
 			}
 		}
 	}

@@ -118,6 +118,8 @@ func diffOriginalDatabaseAccount(
 	start time.Time,
 	ctr *controllertest.ControllerMockWrapper,
 ) {
+	t.Helper()
+
 	diff := cmp.Diff(ctr.GetDatabaseAccountOriginal(), ctr.GetDatabaseAccount())
 	testhelp.Errorf(t, start, "rec.Reconcile(): DatabaseAccount object -original +final:\n%s", diff)
 }
