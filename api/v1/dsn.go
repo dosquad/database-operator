@@ -1,3 +1,4 @@
+//nolint:godot // it does end in a dot.
 package v1
 
 import "net/url"
