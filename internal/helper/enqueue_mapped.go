@@ -61,8 +61,8 @@ type enqueueRequestsFromMapFunc struct {
 // Create implements EventHandler.
 func (e *enqueueRequestsFromMapFunc) Create(
 	ctx context.Context,
-	evt event.CreateEvent,
-	q workqueue.RateLimitingInterface,
+	evt event.TypedCreateEvent[client.Object],
+	q workqueue.TypedRateLimitingInterface[reconcile.Request],
 ) {
 	ctx, logger := e.loggerDetail(ctx, evt.Object)
 
@@ -74,8 +74,8 @@ func (e *enqueueRequestsFromMapFunc) Create(
 // Update implements EventHandler.
 func (e *enqueueRequestsFromMapFunc) Update(
 	ctx context.Context,
-	evt event.UpdateEvent,
-	q workqueue.RateLimitingInterface,
+	evt event.TypedUpdateEvent[client.Object],
+	q workqueue.TypedRateLimitingInterface[reconcile.Request],
 ) {
 	ctx, logger := e.loggerDetail(ctx, evt.ObjectNew)
 
@@ -89,8 +89,8 @@ func (e *enqueueRequestsFromMapFunc) Update(
 // Delete implements EventHandler.
 func (e *enqueueRequestsFromMapFunc) Delete(
 	ctx context.Context,
-	evt event.DeleteEvent,
-	q workqueue.RateLimitingInterface,
+	evt event.TypedDeleteEvent[client.Object],
+	q workqueue.TypedRateLimitingInterface[reconcile.Request],
 ) {
 	ctx, logger := e.loggerDetail(ctx, evt.Object)
 
@@ -102,8 +102,8 @@ func (e *enqueueRequestsFromMapFunc) Delete(
 // Generic implements EventHandler.
 func (e *enqueueRequestsFromMapFunc) Generic(
 	ctx context.Context,
-	evt event.GenericEvent,
-	q workqueue.RateLimitingInterface,
+	evt event.TypedGenericEvent[client.Object],
+	q workqueue.TypedRateLimitingInterface[reconcile.Request],
 ) {
 	ctx, logger := e.loggerDetail(ctx, evt.Object)
 
@@ -114,7 +114,8 @@ func (e *enqueueRequestsFromMapFunc) Generic(
 
 func (e *enqueueRequestsFromMapFunc) loggerDetail(
 	ctx context.Context,
-	obj client.Object) (context.Context, logr.Logger) {
+	obj client.Object,
+) (context.Context, logr.Logger) {
 	logger := log.FromContext(ctx)
 	callID := ulid.Make().String()
 	logger = logger.WithValues(
@@ -128,7 +129,7 @@ func (e *enqueueRequestsFromMapFunc) loggerDetail(
 
 func (e *enqueueRequestsFromMapFunc) mapAndEnqueue(
 	ctx context.Context,
-	q workqueue.RateLimitingInterface,
+	q workqueue.TypedRateLimitingInterface[reconcile.Request],
 	object client.Object,
 	reqs map[reconcile.Request]empty,
 ) {

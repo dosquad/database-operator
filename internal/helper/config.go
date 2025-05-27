@@ -11,8 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 // loadFile is used from the mutex.Once to load the file.
@@ -40,7 +38,6 @@ func loadFile(configFile string) (*dbov1.DatabaseAccountControllerConfig, error)
 	return newObj, nil
 }
 
-//nolint:gocognit // testing each parameter before overwriting options.
 func LoadConfigFile(configFile string, options ctrl.Options) (
 	ctrl.Options, *dbov1.DatabaseAccountControllerConfig, error,
 ) {
@@ -56,15 +53,15 @@ func LoadConfigFile(configFile string, options ctrl.Options) (
 	options = setLeaderElectionConfig(options, newObj)
 
 	if options.Cache.SyncPeriod == nil && newObj.SyncPeriod != nil {
-		options.Cache.SyncPeriod = &newObj.SyncPeriod.Duration
+		options.Cache.SyncPeriod = newObj.SyncPeriod
 	}
 
-	if len(options.Cache.DefaultNamespaces) == 0 && newObj.CacheNamespace != "" {
-		options.Cache.DefaultNamespaces = map[string]cache.Config{newObj.CacheNamespace: {}}
-	}
+	// if len(options.Cache.DefaultNamespaces) == 0 && newObj.CacheNamespace != "" {
+	// 	options.Cache.DefaultNamespaces = map[string]cache.Config{newObj.CacheNamespace: {}}
+	// }
 
-	if options.Metrics.BindAddress == "" && newObj.Metrics.BindAddress != "" {
-		options.Metrics.BindAddress = newObj.Metrics.BindAddress
+	if options.Metrics.BindAddress == "" && newObj.MetricsBindAddress != "" {
+		options.Metrics.BindAddress = newObj.MetricsBindAddress
 	}
 
 	if options.HealthProbeBindAddress == "" && newObj.Health.HealthProbeBindAddress != "" {
@@ -79,27 +76,27 @@ func LoadConfigFile(configFile string, options ctrl.Options) (
 		options.LivenessEndpointName = newObj.Health.LivenessEndpointName
 	}
 
-	if options.WebhookServer == nil {
-		port := 0
-		if newObj.Webhook.Port != nil {
-			port = *newObj.Webhook.Port
-		}
-		options.WebhookServer = webhook.NewServer(webhook.Options{
-			Port:    port,
-			Host:    newObj.Webhook.Host,
-			CertDir: newObj.Webhook.CertDir,
-		})
-	}
+	// if options.WebhookServer == nil {
+	// 	port := 0
+	// 	if newObj.Webhook.Port != nil {
+	// 		port = *newObj.Webhook.Port
+	// 	}
+	// 	options.WebhookServer = webhook.NewServer(webhook.Options{
+	// 		Port:    port,
+	// 		Host:    newObj.Webhook.Host,
+	// 		CertDir: newObj.Webhook.CertDir,
+	// 	})
+	// }
 
-	if newObj.Controller != nil {
-		if options.Controller.CacheSyncTimeout == 0 && newObj.Controller.CacheSyncTimeout != nil {
-			options.Controller.CacheSyncTimeout = *newObj.Controller.CacheSyncTimeout
-		}
+	// if newObj.Controller != nil {
+	// 	if options.Controller.CacheSyncTimeout == 0 && newObj.Controller.CacheSyncTimeout != nil {
+	// 		options.Controller.CacheSyncTimeout = *newObj.Controller.CacheSyncTimeout
+	// 	}
 
-		if len(options.Controller.GroupKindConcurrency) == 0 && len(newObj.Controller.GroupKindConcurrency) > 0 {
-			options.Controller.GroupKindConcurrency = newObj.Controller.GroupKindConcurrency
-		}
-	}
+	// 	if len(options.Controller.GroupKindConcurrency) == 0 && len(newObj.Controller.GroupKindConcurrency) > 0 {
+	// 		options.Controller.GroupKindConcurrency = newObj.Controller.GroupKindConcurrency
+	// 	}
+	// }
 
 	return options, newObj, nil
 }

@@ -7,7 +7,7 @@ type MockSubResourceClientConstructor struct {
 	OnSubResource func(subResource string) client.SubResourceClient
 }
 
-// SubResourceClientConstructor returns a subresource client for the named subResource. Known
+// SubResource returns a subresource client for the named subResource. Known
 // upstream subResources usages are:
 //
 //   - ServiceAccount token creation:
