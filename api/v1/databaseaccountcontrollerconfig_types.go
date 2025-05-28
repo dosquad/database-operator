@@ -19,10 +19,7 @@ package v1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	configv1alpha1 "k8s.io/component-base/config/v1alpha1"
-	cfg "sigs.k8s.io/controller-runtime/pkg/config/v1alpha1"
 )
-
-const ()
 
 // DatabaseAccountControllerConfig is the Schema for the databaseaccountcontrollerconfigs API.
 //
@@ -31,8 +28,8 @@ type DatabaseAccountControllerConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// ControllerManagerConfigurationSpec returns the contfigurations for controllers
-	cfg.ControllerManagerConfigurationSpec `json:",inline"`
+	// ControllerManagerConfiguration returns the contfigurations for controllers
+	ControllerManagerConfiguration `json:",inline"`
 
 	Debug DatabaseAccountControllerConfigDebug `json:"debug,omitempty"`
 

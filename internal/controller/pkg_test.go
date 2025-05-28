@@ -105,10 +105,9 @@ func newReconciler(_ *testing.T, _ time.Time) (
 func newLoggerContext(t *testing.T, start time.Time) (context.Context, *testhelp.TestingLogWrapper) {
 	t.Helper()
 
-	ctx := context.TODO()
 	l := testhelp.NewTestingLogWrapper(t, start)
 	tl := logr.New(l)
-	ctx = logr.NewContext(ctx, tl)
+	ctx := logr.NewContext(t.Context(), tl)
 
 	return ctx, l
 }

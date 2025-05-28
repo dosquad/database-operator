@@ -20,7 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"strings"
 	"time"
 
@@ -108,8 +108,8 @@ func (r *DatabaseAccountReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	)
 
 	if r.Config.Debug.ReconcileSleep > 0 {
-		//nolint:gosec,gomnd // simple random for use when debugging.
-		n := rand.Intn(r.Config.Debug.ReconcileSleep/RatioForJitter) + r.Config.Debug.ReconcileSleep/RatioForJitter
+		//nolint:gosec // simple random for use when debugging.
+		n := rand.IntN(r.Config.Debug.ReconcileSleep/RatioForJitter) + r.Config.Debug.ReconcileSleep/RatioForJitter
 		logger.V(1).Info(fmt.Sprintf("sleeping %d seconds", n))
 		time.Sleep(time.Duration(n) * time.Second)
 	}
@@ -432,7 +432,9 @@ func (r *DatabaseAccountReconciler) stageDatabaseCreate(
 			var err error
 			dbName, err = r.AccountServer.CreateDatabase(ctx, name, name)
 			if err != nil {
-				r.Recorder.WarningEvent(dbAccount, ReasonDatabaseCreate, fmt.Sprintf("Failed to create database: %s", err))
+				r.Recorder.WarningEvent(dbAccount, ReasonDatabaseCreate,
+					fmt.Sprintf("Failed to create database: %s", err),
+				)
 				return ctrl.Result{}, err
 			}
 		}

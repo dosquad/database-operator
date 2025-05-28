@@ -176,7 +176,6 @@ func TestUpdateStatus(t *testing.T) {
 	start := time.Now()
 
 	dba := v1test.NewDatabaseAccount()
-	ctx := context.TODO()
 	c := v1test.NewMockClient()
 
 	var changeObject v1.DatabaseAccount
@@ -197,7 +196,7 @@ func TestUpdateStatus(t *testing.T) {
 		return nil
 	}
 
-	if err := dba.UpdateStatus(ctx, c); err != nil {
+	if err := dba.UpdateStatus(t.Context(), c); err != nil {
 		testhelp.Errorf(t, start, "dba.UpdateStatus(): error got '%v', want 'nil'", err)
 	}
 
@@ -219,7 +218,6 @@ func TestUpdate(t *testing.T) {
 	start := time.Now()
 
 	dba := v1test.NewDatabaseAccount()
-	ctx := context.TODO()
 	c := v1test.NewMockClient()
 
 	var changeObject v1.DatabaseAccount
@@ -237,7 +235,7 @@ func TestUpdate(t *testing.T) {
 		return nil
 	}
 
-	if err := dba.Update(ctx, c); err != nil {
+	if err := dba.Update(t.Context(), c); err != nil {
 		testhelp.Errorf(t, start, "dba.Update(): error got '%v', want 'nil'", err)
 	}
 
@@ -258,7 +256,6 @@ func TestUpdate(t *testing.T) {
 func TestSetStage(t *testing.T) {
 	t.Parallel()
 	start := time.Now()
-	ctx := context.TODO()
 
 	tests := []struct {
 		name                 string
@@ -309,7 +306,7 @@ func TestSetStage(t *testing.T) {
 				return nil
 			}
 
-			if err := dba.SetStage(ctx, c, tt.state); err != nil {
+			if err := dba.SetStage(t.Context(), c, tt.state); err != nil {
 				testhelp.Errorf(t, start, "dba.SetStage(): error, got '%v', want 'nil'", err)
 			}
 

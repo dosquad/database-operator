@@ -19,9 +19,10 @@ const (
 	PostgreSQLNameDataMin = 3
 )
 
-// based on pgx.Identifier from `jackc/pgx`
 // PGIdentifier a PostgreSQL identifier or name. Identifiers can be composed of
 // multiple parts such as ["schema", "table"] or ["table", "column"].
+//
+// based on pgx.Identifier from `jackc/pgx`.
 type PGIdentifier string
 
 // String returns a string safe for SQL and URIs.

@@ -32,7 +32,7 @@ func testNewMockDB(t *testing.T) (
 	t.Helper()
 
 	strt := time.Now()
-	ctx, cancel := context.WithCancel(context.TODO())
+	ctx, cancel := context.WithCancel(t.Context())
 	dsn := dbov1.PostgreSQLDSN("postgresql://localhost:53357/testdb")
 	mDB := accountsvrtest.NewMockDB(t, nil, dsn)
 
@@ -93,7 +93,9 @@ func TestAccountSvr_CheckInvalidName(t *testing.T) {
 			}
 
 			if name != tt.expectDatabaseName {
-				testhelp.Errorf(t, start, "valid.PGIdentifier(): name, got '%s', want '%s'", name, tt.expectDatabaseName)
+				testhelp.Errorf(t, start,
+					"valid.PGIdentifier(): name, got '%s', want '%s'", name, tt.expectDatabaseName,
+				)
 			}
 		})
 	}
@@ -308,11 +310,15 @@ func TestAccountSvr_IsRole(t *testing.T) {
 
 			isRole, err := svr.IsRole(ctx, tt.roleName)
 			if !errors.Is(err, tt.expectedError) {
-				testhelp.Errorf(t, start, "accountsvr.IsRole(ctx): error, got '%v', want '%v'", err, tt.expectedError)
+				testhelp.Errorf(t, start,
+					"accountsvr.IsRole(ctx): error, got '%v', want '%v'", err, tt.expectedError,
+				)
 			}
 
 			if isRole != tt.roleExists {
-				testhelp.Errorf(t, start, "accountsvr.IsRole(ctx): role exists, got '%t', want '%t'", isRole, tt.roleExists)
+				testhelp.Errorf(t, start,
+					"accountsvr.IsRole(ctx): role exists, got '%t', want '%t'", isRole, tt.roleExists,
+				)
 			}
 
 			expectCalledFunc := map[string]int{
@@ -341,7 +347,11 @@ func TestAccountSvr_IsDatabase(t *testing.T) {
 		{"ExpectFail_DatabaseDoesNotExist", "poly", "poly", false, nil},
 		{"ExpectFail_ServerError", "internal_server_error", "internal_server_error", false, internalServerError},
 		{"ExpectSuccess_CorrectedDatabaseName", "roly-poly", "rolypoly", true, nil},
-		{"ExpectFail_DatabaseNameLength", strings.Repeat("x", 64), strings.Repeat("x", 64), false, valid.ErrInvalidName},
+		{
+			"ExpectFail_DatabaseNameLength",
+			strings.Repeat("x", 64), strings.Repeat("x", 64),
+			false, valid.ErrInvalidName,
+		},
 	}
 
 	for _, tt := range tests {
@@ -369,7 +379,9 @@ func TestAccountSvr_IsDatabase(t *testing.T) {
 
 			dbName, dbExists, err := svr.IsDatabase(ctx, tt.databaseName)
 			if !errors.Is(err, tt.expectedError) {
-				testhelp.Errorf(t, start, "accountsvr.IsDatabase(ctx): error, got '%v', want '%v'", err, tt.expectedError)
+				testhelp.Errorf(t, start,
+					"accountsvr.IsDatabase(ctx): error, got '%v', want '%v'", err, tt.expectedError,
+				)
 			}
 
 			if dbExists != tt.expectDatabaseExists {
@@ -564,7 +576,9 @@ func TestAccountSvr_UpdateRolePassword(t *testing.T) {
 
 			roleName, pw, err := svr.UpdateRolePassword(ctx, tt.rolename)
 			if !errors.Is(err, tt.expectedError) {
-				testhelp.Errorf(t, start, "accountsvr.UpdateRolePassword(ctx): error, got '%v', want '%v'", err, tt.expectedError)
+				testhelp.Errorf(t, start,
+					"accountsvr.UpdateRolePassword(ctx): error, got '%v', want '%v'", err, tt.expectedError,
+				)
 			}
 
 			if roleName != tt.expectRolename {
@@ -594,12 +608,16 @@ func TestAccountSvr_UpdateRolePassword(t *testing.T) {
 					!strings.ContainsAny(pw, password.UpperLetters) ||
 					!strings.ContainsAny(pw, password.Symbols) ||
 					len(pw) < 16 {
-					testhelp.Errorf(t, start, "accountsvr.UpdateRolePassword(ctx): password complexity not met, got '%s'", pw)
+					testhelp.Errorf(t, start,
+						"accountsvr.UpdateRolePassword(ctx): password complexity not met, got '%s'", pw,
+					)
 				}
 			}
 
 			if diff := cmp.Diff(mDB.CallCountMap(), expectCalledFunc); diff != "" {
-				testhelp.Errorf(t, start, "accountsvr.UpdateRolePassword(ctx): called functions -got +want:\n%s", diff)
+				testhelp.Errorf(t, start,
+					"accountsvr.UpdateRolePassword(ctx): called functions -got +want:\n%s", diff,
+				)
 			}
 		})
 	}
@@ -655,7 +673,9 @@ func TestAccountSvr_CreateDatabase(t *testing.T) {
 
 			dbName, err := svr.CreateDatabase(ctx, tt.databaseName, tt.roleName)
 			if !errors.Is(err, tt.expectedError) {
-				testhelp.Errorf(t, start, "accountsvr.CreateDatabase(ctx): error, got '%v', want '%v'", err, tt.expectedError)
+				testhelp.Errorf(t, start,
+					"accountsvr.CreateDatabase(ctx): error, got '%v', want '%v'", err, tt.expectedError,
+				)
 			}
 
 			if dbName != tt.expectDatabaseName {
@@ -696,9 +716,18 @@ func TestAccountSvr_CreateSchema(t *testing.T) {
 		{"ExpectSuccess_CorrectedSchemaName", "new-roly", "rolename", "newroly", "rolename", true, nil},
 		{"ExpectSuccess_CorrectedRoleName", "newroly", "role-name", "newroly", "rolename", true, nil},
 		{"ExpectSuccess_CorrectedSchemaAndRoleName", "new-roly", "role-name", "newroly", "rolename", true, nil},
-		{"ExpectFail_ServerErrorExec", "exec_internal_server_error", "rolename", "", "rolename", true, internalServerError},
-		{"ExpectFail_SchemaNameLength", strings.Repeat("x", 64), "rolename", "", "", false, valid.ErrInvalidName},
-		{"ExpectFail_RoleNameLength", "dbname", strings.Repeat("x", 64), "", "", false, valid.ErrInvalidName},
+		{
+			"ExpectFail_ServerErrorExec",
+			"exec_internal_server_error", "rolename", "", "rolename", true, internalServerError,
+		},
+		{
+			"ExpectFail_SchemaNameLength",
+			strings.Repeat("x", 64), "rolename", "", "", false, valid.ErrInvalidName,
+		},
+		{
+			"ExpectFail_RoleNameLength",
+			"dbname", strings.Repeat("x", 64), "", "", false, valid.ErrInvalidName,
+		},
 	}
 
 	for _, tt := range tests {
@@ -739,7 +768,9 @@ func TestAccountSvr_CreateSchema(t *testing.T) {
 
 			err := svr.CreateSchema(ctx, tt.schemaName, tt.roleName)
 			if !errors.Is(err, tt.expectedError) {
-				testhelp.Errorf(t, start, "accountsvr.CreateSchema(ctx): error, got '%v', want '%v'", err, tt.expectedError)
+				testhelp.Errorf(t, start,
+					"accountsvr.CreateSchema(ctx): error, got '%v', want '%v'", err, tt.expectedError,
+				)
 			}
 
 			if err == nil {
@@ -830,7 +861,8 @@ func TestAccountSvr_GetDatabaseHost(t *testing.T) {
 			},
 			"objectname",
 		},
-		{"ExpectSuccess_DatabaseHost",
+		{
+			"ExpectSuccess_DatabaseHost",
 			&dbov1.DatabaseAccount{
 				Spec: dbov1.DatabaseAccountSpec{CreateRelay: false, SecretName: "secret"},
 				ObjectMeta: metav1.ObjectMeta{
@@ -920,7 +952,9 @@ func TestAccountSvr_GetSecretKV(t *testing.T) {
 		)
 	}
 
-	if v := accountsvr.GetSecretKV(secret, accountsvr.DatabaseKeyPort); v != strconv.FormatInt(accountsvrtest.Port, 10) {
+	if v := accountsvr.GetSecretKV(
+		secret, accountsvr.DatabaseKeyPort,
+	); v != strconv.FormatInt(accountsvrtest.Port, 10) {
 		testhelp.Errorf(t, start,
 			"accountsvr.GetSecretKV(%s): got '%s', want '%d'", accountsvr.DatabaseKeyPort, v, accountsvrtest.Port,
 		)
